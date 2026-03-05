@@ -1,0 +1,221 @@
+@import "tailwindcss";
+@import url("https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,opsz,wght@0,6..12,200..1000;1,6..12,200..1000&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap");
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  --background-login: #f4f7feff;
+}
+
+body {
+  @apply bg-white text-black;
+}
+
+.dark body {
+  @apply bg-[#0F172A] text-white;
+}
+
+header {
+  @apply bg-gray-100 text-black;
+}
+
+.dark header {
+  @apply bg-[#1F2937] text-white;
+}
+
+.component-checkpoint {
+  @apply bg-gray-100 text-black;
+}
+
+.dark .component-checkpoint {
+  @apply bg-[#1E2835] text-white;
+}
+
+.turnstile {
+  @apply bg-gray-100 text-black;
+}
+
+.dark .turnstile {
+  @apply bg-[#1E2835] text-white;
+}
+
+.turnstile-title {
+  @apply bg-gray-200 text-black;
+}
+
+.dark .turnstile-title {
+  @apply bg-[#374151] text-white;
+}
+
+.input {
+  @apply bg-white text-black;
+}
+
+.dark .input {
+  @apply bg-[#1E2835] text-white;
+}
+
+.table {
+  @apply min-w-full divide-y divide-gray-200 text-sm border border-gray-200 bg-white text-black;
+}
+
+.table thead {
+  @apply bg-gray-100;
+}
+
+.table th {
+  @apply px-4 py-2 text-left font-semibold;
+}
+
+.table td {
+  @apply px-4 py-2;
+}
+
+.table tbody tr {
+  @apply hover:bg-gray-50;
+}
+
+/* Dark mode */
+.dark .table {
+  @apply bg-[#1E2835] text-white border-gray-700 divide-gray-700;
+}
+
+.dark .table thead {
+  @apply bg-[#2A3547];
+}
+
+.dark .table tbody tr {
+  @apply hover:bg-[#2F3B4D];
+}
+
+* {
+  font-family: "Nunito Sans", sans-serif !important;
+  box-sizing: border-box;
+  background: "#E9E9E9";
+}
+
+.login {
+  background: var(--background-login);
+  color: var(--foreground);
+  font-family: "DM Sans", sans-serif;
+}
+
+.login .second-part {
+  background: linear-gradient(135deg, #1f2e61 0%, #a6acc2 50%, #1f2e61 100%);
+}
+
+.user-rectangle {
+  background: linear-gradient(to right, #b4d9f7, #fefae0);
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+.slide-in {
+  animation: slideIn 0.5s ease-out;
+}
+.scale-in {
+  animation: scaleIn 0.5s ease-out;
+}
+.pulse-dot {
+  animation: pulse 2s infinite;
+}
+
+/* From Uiverse.io by MRez321 */
+.theme-switch {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  direction: rtl;
+}
+
+#theme-checkbox {
+  display: none;
+}
+
+#theme-checkbox + label {
+  /* change the font-size below to change the size of the switch button*/
+  font-size: 2rem;
+  height: 1em;
+  width: 2.5em;
+  border-radius: 0.25em;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  background-color: #cecece;
+  position: relative;
+}
+
+#theme-checkbox:checked + label {
+  background-color: #3a3a3a;
+}
+
+#theme-checkbox + label:active {
+  transform: scale(0.85);
+  transition: transform 0.2s;
+}
+
+#theme-checkbox + label div {
+  width: 0.8em;
+  height: 0.8em;
+  border-radius: inherit;
+  position: absolute;
+  top: 0.1em;
+  left: 0.1em;
+  z-index: 10;
+  transition: 0.5s cubic-bezier(1, 0.33, 0.11, 1.34);
+  background-color: #f2f2f2;
+}
+
+#theme-checkbox:checked + label div {
+  /* left: calc(2.5em - .8em - .1em); */
+  left: 1.6em;
+  background-color: #212121;
+}
+
+#theme-checkbox + label span {
+  display: flex;
+}
+
+#theme-checkbox + label svg {
+  display: inline-block;
+  height: 1em;
+  width: 1em;
+  padding: 0.15em;
+  box-sizing: border-box;
+}
+
+#theme-checkbox + label span:first-of-type {
+  color: #3a3a3a;
+}
+
+#theme-checkbox + label span:last-of-type {
+  color: #cecece;
+}

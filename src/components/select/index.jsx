@@ -1,0 +1,92 @@
+import React, { useState, useRef, useEffect } from "react";
+import { KeyboardArrowDown } from "@mui/icons-material";
+import clsx from "clsx";
+
+const CustomSelect = ({
+  label,
+  required = false,
+  error,
+  options = [],
+  value,
+  onChange,
+  placeholder = "Выберите контрольную точку",
+  className = "",
+  returnObject = false, // ✅ yangi prop: true => object qaytaradi, false => faqat value
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const selectRef = useRef(null);
+
+  const toggleDropdown = () => setIsOpen(!isOpen);
+
+  const handleSelect = (opt) => {
+    onChange(returnObject ? opt : opt.value); // ✅ object yoki value
+    setIsOpen(false);
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (selectRef.current && !selectRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const selectedLabel = returnObject
+    ? value?.label
+    : options.find((opt) => opt.value === value)?.label;
+
+  return (
+    <div className={`relative w-full  ${className}`} ref={selectRef}>
+      {label && (
+        <label className="block mb-1 text-sm">
+          {label}
+          {required && <span className="text-red-500"> *</span>}
+        </label>
+      )}
+
+      <button
+        type="button"
+        onClick={toggleDropdown}
+        className={clsx(
+          "w-full h-[45px] border rounded-md p-2 text-[15px] text-left  flex items-center justify-between focus:outline-none focus:ring-2",
+          error
+            ? "border-red-500 focus:ring-red-500"
+            : "border-gray-300 focus:ring-blue-500"
+        )}
+      >
+        <span className={clsx("truncate", !value && "text-gray-400")}>
+          {selectedLabel || placeholder}
+        </span>
+        <KeyboardArrowDown
+          className={`transition-transform duration-200 ${
+            isOpen ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+
+      {isOpen && (
+        <ul className="absolute z-10 mt-2 w-full component-checkpoint border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
+          {options.map((opt, idx) => (
+            <li
+              key={idx}
+              className={clsx(
+                "px-4 py-2 hover:component-checkpoint cursor-pointer",
+                (returnObject ? value?.value : value) === opt.value &&
+                  "component-checkpoint font-medium"
+              )}
+              onClick={() => handleSelect(opt)}
+            >
+              {opt.label}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+    </div>
+  );
+};
+
+export default CustomSelect;
