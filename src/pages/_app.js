@@ -6,7 +6,7 @@ import { SessionProvider } from "next-auth/react";
 import reactQueryClient from "@/config/react-query";
 
 import CssBaseline from "@mui/material/CssBaseline";
-import { ThemeProvider as NextThemesProvider } from "next-themes"; // qo‘shildi
+import { ThemeProvider as NextThemesProvider } from "next-themes";
 import "@/styles/globals.css";
 import "@/styles/loader.css";
 
@@ -21,14 +21,13 @@ export default function App({
 
   const isHomePage = router.pathname === "/";
 
-  // next-themes ichidan hozirgi theme ni olish uchun state
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  if (!mounted) return null; // Server Side Rendering da mismatch oldini olish uchun
+  if (!mounted) return null;
 
   return (
     <SessionProvider session={session}>
@@ -38,7 +37,6 @@ export default function App({
             attribute="class"
             defaultTheme="dark"
             value={{ light: "light", dark: "dark" }}
-            onChange={(theme) => setMode(theme)}
           >
             <CssBaseline />
             {isHomePage ? (
@@ -48,7 +46,6 @@ export default function App({
                 <Component {...pageProps} />
               </Layout>
             )}
-
 
             <ClientOnlyToaster />
           </NextThemesProvider>

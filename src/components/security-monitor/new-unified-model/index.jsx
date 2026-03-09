@@ -15,6 +15,7 @@ import StarOutlinedIcon from "@mui/icons-material/StarOutlined";
 import ExitToAppIcon from "@mui/icons-material/ExitToApp";
 import LoginIcon from "@mui/icons-material/Login";
 import dayjs from "dayjs";
+import { useTheme } from "next-themes";
 
 // Constants
 const TIME_SECTION_NAMES = {
@@ -27,23 +28,12 @@ const TIME_SECTION_NAMES = {
   6: "КПП АО ТЭС",
 };
 
-const TIME_SECTION_COLORS = {
-  VIP: "bg-yellow-400 text-white",
-  "КПП АО ТЭС": "bg-blue-100 text-blue-800",
-  "График Созлаш": "bg-purple-100 text-purple-800",
-  "Созлаш 9:00-17:00": "bg-green-100 text-green-800",
-  "Созлаш 9:00-16:00": "bg-pink-100 text-pink-800",
-  "АО ТЭС 9:00-17:00": "bg-orange-100 text-orange-800",
-  "Созлаш 9:00-18:00": "bg-indigo-100 text-indigo-800",
-};
-
 const ERROR_MESSAGES = {
   0: "Доступ разрешён",
   16: "Нет доступа",
   32: "Проход запрещён (вне графика)",
 };
 
-// Animation configurations
 const ANIMATIONS = {
   fadeIn: {
     initial: { opacity: 0, y: 10 },
@@ -53,12 +43,124 @@ const ANIMATIONS = {
   },
 };
 
+// Keyframes injected once — only what Tailwind can't express
+const CyberStyles = () => (
+  <style>{`
+    @keyframes scanline {
+      0%   { top: 0%; }
+      100% { top: 100%; }
+    }
+    @keyframes cyberPing {
+      0%   { transform: scale(1);   opacity: 0.6; }
+      100% { transform: scale(2.2); opacity: 0;   }
+    }
+    @keyframes borderPulse {
+      0%, 100% { opacity: 1;   }
+      50%       { opacity: 0.5; }
+    }
+    @keyframes flicker {
+      0%, 92%, 100% { opacity: 1;    }
+      94%           { opacity: 0.85; }
+      96%           { opacity: 1;    }
+      98%           { opacity: 0.9;  }
+    }
+
+    .cyber-flicker   { animation: flicker 9s ease-in-out infinite; }
+
+    .cyber-scanline::after {
+      content: '';
+      position: absolute; left: 0; right: 0;
+      height: 1px;
+      animation: scanline 4s linear infinite;
+      pointer-events: none;
+    }
+    .cyber-scanline-green::after { background: linear-gradient(90deg, transparent, rgba(0,255,136,0.35), transparent); }
+    .cyber-scanline-red::after   { background: linear-gradient(90deg, transparent, rgba(255,51,85,0.35),  transparent); }
+
+    .ping-ring   { animation: cyberPing 1.8s ease-out infinite; }
+    .ping-ring-2 { animation: cyberPing 1.8s ease-out infinite; animation-delay: 0.6s; }
+    .pulse-dot   { animation: borderPulse 1.5s ease-in-out infinite; }
+    .status-glow { animation: borderPulse 3s ease-in-out infinite; }
+  `}</style>
+);
+
+// --- Corner bracket ---
+const Corner = ({ pos, isSuccess }) => {
+  const colorClass = isSuccess
+    ? "border-green-400 [box-shadow:0_0_6px_rgba(0,255,136,0.5)]"
+    : "border-red-500 [box-shadow:0_0_6px_rgba(255,51,85,0.5)]";
+  const posClass = {
+    tl: "top-0 left-0 border-t-2 border-l-2",
+    tr: "top-0 right-0 border-t-2 border-r-2",
+    bl: "bottom-0 left-0 border-b-2 border-l-2",
+    br: "bottom-0 right-0 border-b-2 border-r-2",
+  }[pos];
+  return <div className={`absolute w-5 h-5 ${posClass} ${colorClass}`} />;
+};
+
+const CornerGray = ({ pos }) => {
+  const posClass = {
+    tl: "top-0 left-0 border-t-2 border-l-2",
+    tr: "top-0 right-0 border-t-2 border-r-2",
+    bl: "bottom-0 left-0 border-b-2 border-l-2",
+    br: "bottom-0 right-0 border-b-2 border-r-2",
+  }[pos];
+  return <div className={`absolute w-5 h-5 ${posClass} border-slate-700`} />;
+};
+
+// --- Info tile ---
+const InfoTile = ({ icon, label, value, isSuccess, isDark }) => (
+  <div
+    className={`rounded-xl p-3 space-y-1 ${
+      isDark
+        ? "bg-white/[0.02] border border-white/[0.06]"
+        : "bg-white border border-slate-200"
+    }`}
+  >
+    <div className="flex items-center gap-1.5">
+      <span className={isSuccess ? "text-green-400" : "text-red-400"}>
+        {icon}
+      </span>
+      <span className="font-mono-cyber line-clamp-3 text-[9px] font-bold tracking-widest uppercase text-slate-500">
+        {label}
+      </span>
+    </div>
+    <p
+      className={`text-sm font-semibold leading-snug ${isDark ? "text-slate-300" : "text-slate-700"}`}
+    >
+      {value}
+    </p>
+  </div>
+);
+
+// --- Divider dots ---
+const CyberDivider = ({ isSuccess }) => (
+  <div className="flex items-center gap-2.5">
+    <div
+      className={`flex-1 h-px ${isSuccess ? "bg-gradient-to-r from-transparent to-green-400/30" : "bg-gradient-to-r from-transparent to-red-500/30"}`}
+    />
+    {[0.2, 0.35, 0.5, 0.65, 0.8].map((op, i) => (
+      <div
+        key={i}
+        className={`w-1 h-1 rounded-full ${isSuccess ? "bg-green-400 [box-shadow:0_0_4px_#00ff88]" : "bg-red-500 [box-shadow:0_0_4px_#ff3355]"}`}
+        style={{ opacity: op }}
+      />
+    ))}
+    <div
+      className={`flex-1 h-px ${isSuccess ? "bg-gradient-to-l from-transparent to-green-400/30" : "bg-gradient-to-l from-transparent to-red-500/30"}`}
+    />
+  </div>
+);
+
+// ============================================================
+// Main Component
+// ============================================================
 const NewUnifiedPanel = ({ data, variant = "main", panelNumber }) => {
+  const { theme } = useTheme();
   const { data: session } = useSession();
   const [employeeInfo, setEmployeeInfo] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Derived values
   const isValidUser = data?.employee_id && data.employee_id !== 0;
   const errorCode = data?.error_code;
   const isSuccess = errorCode === "Успешно";
@@ -77,377 +179,476 @@ const NewUnifiedPanel = ({ data, variant = "main", panelNumber }) => {
     ? dayjs(data.real_utc).format("DD.MM.YYYY")
     : "";
 
-  // Fetch employee info
   useEffect(() => {
     if (!isValidUser || !session?.accessToken) {
       setEmployeeInfo(null);
       return;
     }
-
     const fetchEmployeeInfo = async () => {
       setIsLoading(true);
       try {
         const res = await fetch(
           `${config.GENERAL_AUTH_URL}staffio/employee/photo/${data?.employee_id}`,
-          {
-            headers: {
-              'Authorization': `Bearer ${session?.accessToken}`
-            }
-          }
+          { headers: { Authorization: `Bearer ${session?.accessToken}` } },
         );
-
         if (!res.ok) {
           setEmployeeInfo(null);
           return;
         }
-
-        const json = await res.json();
-        setEmployeeInfo(json);
-      } catch (error) {
-        console.error("Error fetching employee:", error);
+        setEmployeeInfo(await res.json());
+      } catch (err) {
+        console.error("Error fetching employee:", err);
         setEmployeeInfo(null);
       } finally {
         setIsLoading(false);
       }
     };
-
     fetchEmployeeInfo();
   }, [data?.employee_id, session?.accessToken, isValidUser]);
 
-  // Calculate badge info
   const sectionId =
     employeeInfo?.timeSectionIdExit ?? employeeInfo?.timeSectionIdEnter ?? 0;
   const graphicName = TIME_SECTION_NAMES[sectionId] || "Неизвестно";
-  const badgeColor =
-    TIME_SECTION_COLORS[graphicName] || "bg-gray-200 text-gray-800";
 
   const fullName = employeeInfo
-    ? `${employeeInfo.last_name || ""} ${employeeInfo.first_name || ""} ${
-        employeeInfo.middle_name || ""
-      }`.trim()
+    ? `${employeeInfo.last_name || ""} ${employeeInfo.first_name || ""} ${employeeInfo.middle_name || ""}`.trim()
     : data?.card_name || "Неизвестно";
 
-  // Event type visual config
   const isEntry = data?.event_type === "Вход";
-  const eventConfig = isEntry
-    ? {
-        icon: LoginIcon,
-        label: "ВХОД",
-        color: "bg-green-500",
-        backgroundColor: "bg-green-500",
-        textColor: "text-white",
+  const isDark = theme === "dark";
 
-      }
-    : {
-        icon: ExitToAppIcon,
-        label: "ВЫХОД",
-        color: "bg-red-500",
-        lightColor: "bg-red-50",
-        textColor: "text-white",
-        backgroundColor: "bg-red-500",
-      };
-
-  // Empty state
+  // ── EMPTY STATE ──────────────────────────────────────────
   if (!data) {
     return (
-      <motion.div
-        {...ANIMATIONS.fadeIn}
-        className={`rounded-2xl border-2 border-dashed border-gray-300 bg-gray-50 flex items-center justify-center ${
-          variant === "main" ? "min-h-[400px] p-12" : "min-h-[150px] p-6"
-        }`}
-      >
-        <div className="text-center">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-200 flex items-center justify-center">
-            <PersonOutlineOutlinedIcon
-              sx={{ fontSize: 32, color: "#9CA3AF" }}
-            />
+      <>
+        <CyberStyles />
+        <motion.div
+          {...ANIMATIONS.fadeIn}
+          className={`cyber-flicker relative rounded-2xl flex items-center justify-center ${
+            isDark
+              ? "bg-gradient-to-br from-slate-900 to-slate-950 border border-white/[0.06]"
+              : "bg-gradient-to-br from-white to-slate-100 border border-slate-200"
+          } ${variant === "main" ? "min-h-[400px] p-12" : "min-h-[150px] p-6"}`}
+        >
+          <CornerGray pos="tl" />
+          <CornerGray pos="tr" />
+          <CornerGray pos="bl" />
+          <CornerGray pos="br" />
+          <div className="text-center">
+            <div className="w-14 h-14 rounded-full bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mx-auto mb-4">
+              <PersonOutlineOutlinedIcon
+                sx={{ fontSize: 28, color: "#334155" }}
+              />
+            </div>
+            <p className="font-mono-cyber text-xs font-bold tracking-widest uppercase text-slate-600">
+              {variant === "main"
+                ? "Ожидание прохода..."
+                : `Сотрудник ${panelNumber}`}
+            </p>
           </div>
-          <p className="text-gray-400 font-medium">
-            {variant === "main"
-              ? "Ожидание прохода..."
-              : `Сотрудник ${panelNumber}`}
-          </p>
-        </div>
-      </motion.div>
+        </motion.div>
+      </>
     );
   }
 
-  // Small variant (archive)
+  // ── SMALL VARIANT (archive) ───────────────────────────────
   if (variant === "small") {
-    const EventIcon = eventConfig.icon;
+    const EventIcon = isEntry ? LoginIcon : ExitToAppIcon;
+    const eventLabel = isEntry ? "ВХОД" : "ВЫХОД";
 
     return (
-      <motion.div
-        {...ANIMATIONS.fadeIn}
-        className={`relative rounded-xl bg-white p-6 shadow-sm border-2 transition-all hover:shadow-md ${
-          isSuccess ? "border-green-300" : "border-red-300"
-        }`}
-      >
-        {/* Status badges */}
-        <div className="absolute top-3 right-3 flex items-center gap-2">
-          {/* Event type with icon - ENTER/EXIT sign style */}
-          <span
-            className={`px-3 py-1.5 text-xs font-bold rounded-md ${eventConfig.backgroundColor} ${eventConfig.textColor} ${eventConfig.borderColor} border-2 flex items-center gap-2 shadow-md uppercase tracking-wide`}
-          >
-            <EventIcon sx={{ fontSize: 20, color: 'white' }} />
-            {eventConfig.label}
-          </span>
+      <>
+        <CyberStyles />
+        <motion.div
+          {...ANIMATIONS.fadeIn}
+          className={`cyber-flicker relative rounded-2xl overflow-hidden border p-5 transition-shadow hover:shadow-lg ${
+            isDark
+              ? "bg-gradient-to-br from-slate-900 to-slate-950"
+              : "bg-gradient-to-br from-white to-slate-100"
+          } ${
+            isSuccess
+              ? "border-green-400/30 [box-shadow:0_0_24px_rgba(0,255,136,0.15),0_8px_32px_rgba(0,0,0,0.4)]"
+              : "border-red-500/30 [box-shadow:0_0_24px_rgba(255,51,85,0.15),0_8px_32px_rgba(0,0,0,0.4)]"
+          }`}
+        >
+          <Corner pos="tl" isSuccess={isSuccess} />
+          <Corner pos="tr" isSuccess={isSuccess} />
+          <Corner pos="bl" isSuccess={isSuccess} />
+          <Corner pos="br" isSuccess={isSuccess} />
 
-          {/* Checkpoint */}
-          <span className="px-3 py-1.5 text-xs font-medium rounded-md bg-gray-100 text-gray-600 border border-gray-300">
-            {data.checkPointName}
-          </span>
-
-          {/* Access status */}
-          <span
-            className={`px-3 py-1.5 text-xs font-semibold rounded-md border ${
-              isSuccess
-                ? "bg-green-50 text-green-700 border-green-300"
-                : "bg-red-50 text-red-700 border-red-300"
-            }`}
-          >
-            {isSuccess ? "РАЗРЕШЕН" : "ЗАПРЕЩЕН"}
-          </span>
-        </div>
-
-        {/* Content */}
-        <div className="flex items-start gap-4 mt-2">
-          <div className="flex-shrink-0">
-            <Avatar
-              name={data.card_name}
-              userId={isValidUser ? data.employee_id : null}
-              photoUrl={employeeInfo?.file_url || null}
-              userName={employeeInfo?.fullName}
-              userJob={employeeInfo?.positionName}
-              size="large"
-            />
+          {/* Badges */}
+          <div className="absolute top-3 right-3 flex items-center gap-2">
+            <span
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold tracking-widest font-mono-cyber ${
+                isEntry
+                  ? "bg-green-400/10 border border-green-400/30 text-green-400"
+                  : "bg-red-500/10 border border-red-500/30 text-red-400"
+              }`}
+            >
+              <EventIcon sx={{ fontSize: 13 }} />
+              {eventLabel}
+            </span>
+            <span className="px-2.5 py-1 rounded-md text-[10px] font-mono-cyber bg-white/[0.04] border border-white/[0.08] text-slate-500">
+              {data.checkPointName}
+            </span>
+            <span
+              className={`px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wider font-mono-cyber ${
+                isSuccess
+                  ? "bg-green-400/10 border border-green-400/30 text-green-400"
+                  : "bg-red-500/10 border border-red-500/30 text-red-400"
+              }`}
+            >
+              {isSuccess ? "РАЗРЕШЕН" : "ЗАПРЕЩЕН"}
+            </span>
           </div>
 
-          <div className="flex-1 min-w-0">
-            <h3 className="text-lg font-bold text-gray-900 truncate mb-2">
-              {fullName}
-            </h3>
-
-            {isValidUser && employeeInfo ? (
-              <div className="space-y-2">
-                <div className="inline-block">
-                  <span className="text-sm px-3 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 font-medium">
+          {/* Content */}
+          <div className="flex items-start gap-4 mt-2">
+            <div className="flex-shrink-0">
+              <Avatar
+                name={data.card_name}
+                userId={isValidUser ? data.employee_id : null}
+                photoUrl={employeeInfo?.file_url || null}
+                userName={employeeInfo?.fullName}
+                userJob={employeeInfo?.positionName}
+                size="large"
+              />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3
+                className={`font-display text-base font-bold truncate mb-2 ${
+                  isDark ? "text-slate-100" : "text-slate-900"
+                }`}
+              >
+                {fullName}
+              </h3>
+              {isValidUser && employeeInfo ? (
+                <div>
+                  <span className="inline-block px-2.5 py-1 rounded-md text-xs font-semibold bg-sky-400/10 border border-sky-400/20 text-sky-400 mb-1.5">
                     {employeeInfo.workplace?.position?.name || "–"}
                   </span>
-                </div>
-                <p className="text-sm text-gray-600">
-                  <span className="font-medium">Отдел:</span>{" "}
-                  {employeeInfo.workplace?.organizational_unit?.name || "–"}
-                </p>
-              </div>
-            ) : (
-              <p className="text-sm text-gray-500 italic">
-                Информация о сотруднике недоступна
-              </p>
-            )}
-
-            <div className="mt-3 pt-3 border-t border-gray-200">
-              <p className="text-sm text-gray-600 flex items-center gap-1">
-                <AccessTimeOutlinedIcon
-                  sx={{ fontSize: 16, color: "#6B7280" }}
-                />
-                {formattedDate} в {timestamp}
-              </p>
-            </div>
-          </div>
-        </div>
-      </motion.div>
-    );
-  }
-
-  // Main variant (live display)
-  return (
-    <motion.div
-      {...ANIMATIONS.fadeIn}
-      className={`rounded-2xl p-6 bg-white shadow-lg border-4 transition-all ${
-        isSuccess
-          ? "border-green-400 shadow-green-100"
-          : "border-red-400 shadow-red-100"
-      }`}
-    >
-      {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <span
-          className={`px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-2 ${badgeColor}`}
-        >
-          {graphicName === "VIP" && (
-            <StarOutlinedIcon sx={{ fontSize: 18 }} />
-          )}
-          {graphicName === "VIP" ? "VIP СОТРУДНИК" : graphicName}
-        </span>
-        <span className="text-sm text-gray-500 px-3 py-1 bg-gray-100 rounded-lg font-medium">
-          {formattedDate}
-        </span>
-      </div>
-
-      {/* Employee info */}
-      <div className="flex items-start gap-6 mb-6">
-        <div className="flex-shrink-0">
-          <Avatar
-            name={data.card_name}
-            userId={isValidUser ? data.employee_id : null}
-            photoUrl={employeeInfo?.file_url || null}
-            userName={employeeInfo?.fullName}
-            userJob={employeeInfo?.positionName}
-            size="large"
-          />
-        </div>
-
-        <div className="flex-1">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4 leading-tight">
-            {fullName}
-          </h1>
-
-          {isValidUser && employeeInfo ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Department */}
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0">
-                  <AccountTreeIcon
-                    sx={{
-                      color: "#06A561",
-                      backgroundColor: "#C4F8E2",
-                      padding: "8px",
-                      width: "44px",
-                      height: "44px",
-                      borderRadius: "10px",
-                    }}
-                  />
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 font-medium mb-1">
-                    Отдел
-                  </p>
-                  <p className="text-base text-gray-900 font-semibold">
+                  <p className="text-xs text-slate-500">
+                    <span className="text-slate-400">Отдел: </span>
                     {employeeInfo.workplace?.organizational_unit?.name || "–"}
                   </p>
                 </div>
-              </div>
-
-              {/* Position */}
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0">
-                  <PersonOutlineOutlinedIcon
-                    sx={{
-                      color: "#F07427",
-                      backgroundColor: "#FFEDD5",
-                      padding: "8px",
-                      width: "44px",
-                      height: "44px",
-                      borderRadius: "10px",
-                    }}
-                  />
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 font-medium mb-1">
-                    Должность
-                  </p>
-                  <p className="text-base text-gray-900 font-semibold">
-                    {employeeInfo.workplace?.position?.name || "–"}
-                  </p>
-                </div>
-              </div>
-
-              {/* Door type */}
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0">
-                  <MeetingRoomIcon
-                    sx={{
-                      color: "#5149E5",
-                      backgroundColor: "#E0E7FF",
-                      padding: "8px",
-                      width: "44px",
-                      height: "44px",
-                      borderRadius: "10px",
-                    }}
-                  />
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 font-medium mb-1">
-                    Тип двери
-                  </p>
-                  <p className="text-base text-gray-900 font-semibold">
-                    {data.event_type}
-                  </p>
-                </div>
-              </div>
-
-              {/* Time */}
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0">
-                  <AccessTimeOutlinedIcon
-                    sx={{
-                      color: "#E65E5E",
-                      backgroundColor: "#FEE2E2",
-                      padding: "8px",
-                      width: "44px",
-                      height: "44px",
-                      borderRadius: "10px",
-                    }}
-                  />
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 font-medium mb-1">
-                    Время прохода
-                  </p>
-                  <p className="text-base text-gray-900 font-semibold">
-                    {timestamp}
-                  </p>
-                </div>
+              ) : (
+                <p className="text-xs text-slate-500 italic">
+                  Информация о сотруднике недоступна
+                </p>
+              )}
+              <div
+                className={`mt-2.5 pt-2.5 flex items-center gap-1.5 ${
+                  isDark
+                    ? "border-t border-white/[0.06]"
+                    : "border-t border-slate-200"
+                }`}
+              >
+                <AccessTimeOutlinedIcon
+                  sx={{ fontSize: 13, color: "#475569" }}
+                />
+                <span className="font-mono-cyber text-xs text-slate-500">
+                  {formattedDate} · {timestamp}
+                </span>
               </div>
             </div>
-          ) : (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <p className="text-red-700 font-medium text-sm">
-                ⚠️ Нет данных о сотруднике
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
+          </div>
+        </motion.div>
+      </>
+    );
+  }
 
-      {/* Status indicator */}
-      <div className="pt-6 border-t border-gray-200">
-        <div className="flex flex-col items-center justify-center gap-3">
-          <div className="relative w-20 h-20">
-            {/* Pulse animation */}
+  // ── MAIN VARIANT (live display) ───────────────────────────
+  return (
+    <>
+      <CyberStyles />
+      <motion.div
+        {...ANIMATIONS.fadeIn}
+        className={`cyber-flicker cyber-scanline relative rounded-2xl overflow-hidden border ${
+          isDark
+            ? "bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900"
+            : "bg-gradient-to-br from-white via-slate-50 to-white"
+        } ${
+          isSuccess
+            ? "cyber-scanline-green border-green-400/30 [box-shadow:0_0_0_1px_rgba(0,255,136,0.08),0_0_40px_rgba(0,255,136,0.2),0_24px_64px_rgba(0,0,0,0.5)]"
+            : "cyber-scanline-red border-red-500/30 [box-shadow:0_0_0_1px_rgba(255,51,85,0.08),0_0_40px_rgba(255,51,85,0.2),0_24px_64px_rgba(0,0,0,0.5)]"
+        }`}
+      >
+        {/* Ambient glow overlay */}
+        <div
+          className={`absolute inset-0 pointer-events-none ${
+            isSuccess
+              ? "bg-[radial-gradient(ellipse_at_50%_0%,rgba(0,255,136,0.05)_0%,transparent_60%)]"
+              : "bg-[radial-gradient(ellipse_at_50%_0%,rgba(255,51,85,0.05)_0%,transparent_60%)]"
+          }`}
+        />
+
+        <Corner pos="tl" isSuccess={isSuccess} />
+        <Corner pos="tr" isSuccess={isSuccess} />
+        <Corner pos="bl" isSuccess={isSuccess} />
+        <Corner pos="br" isSuccess={isSuccess} />
+
+        {/* ── Header strip ── */}
+        <div
+          className={`relative flex items-center justify-between px-5 py-2.5 border-b ${
+            isSuccess
+              ? "border-green-400/10 bg-[linear-gradient(90deg,rgba(0,255,136,0.04),transparent,rgba(0,255,136,0.04))]"
+              : "border-red-500/10 bg-[linear-gradient(90deg,rgba(255,51,85,0.04),transparent,rgba(255,51,85,0.04))]"
+          }`}
+        >
+          <div className="flex items-center gap-2">
             <div
-              className={`absolute inset-0 rounded-full animate-ping opacity-30 ${
-                isSuccess ? "bg-green-500" : "bg-red-500"
+              className={`w-2 h-2 rounded-full pulse-dot ${
+                isSuccess
+                  ? "bg-green-400 [box-shadow:0_0_8px_#00ff88]"
+                  : "bg-red-500 [box-shadow:0_0_8px_#ff3355]"
               }`}
             />
-            {/* Icon */}
-            <div
-              className={`relative z-10 w-20 h-20 rounded-full flex items-center justify-center shadow-lg ${
-                isSuccess ? "bg-green-500" : "bg-red-500"
+            <span
+              className={`font-mono-cyber text-[11px] font-bold tracking-[0.18em] uppercase ${
+                isSuccess ? "text-green-400" : "text-red-400"
               }`}
             >
-              {isSuccess ? (
-                <CheckCircleIcon sx={{ fontSize: 44, color: "white" }} />
+              {graphicName === "VIP" ? (
+                <>
+                  <StarOutlinedIcon
+                    sx={{ fontSize: 13, verticalAlign: "middle" }}
+                  />{" "}
+                  VIP СОТРУДНИК
+                </>
               ) : (
-                <ReportIcon sx={{ fontSize: 44, color: "white" }} />
+                graphicName
+              )}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span
+              className={`font-mono-cyber text-[11px] tracking-widest ${
+                isDark ? "text-slate-500" : "text-slate-600"
+              }`}
+            >
+              {formattedDate}
+            </span>
+            <span
+              className={`font-mono-cyber text-[10px] font-bold px-2 py-0.5 rounded text-sky-400 ${
+                isDark
+                  ? "bg-slate-800 border border-slate-700"
+                  : "bg-slate-100 border border-slate-300"
+              }`}
+            >
+              SYS-02
+            </span>
+          </div>
+        </div>
+
+        {/* ── Body ── */}
+        <div className="p-5 space-y-5">
+          {/* Employee row */}
+          <div className="flex gap-5 items-start">
+            {/* Avatar */}
+            <div className="relative flex-shrink-0">
+              <div
+                className={`rounded-xl border-2 overflow-hidden ${
+                  isSuccess
+                    ? "border-green-400/30 [box-shadow:0_0_20px_rgba(0,255,136,0.15)]"
+                    : "border-red-500/30 [box-shadow:0_0_20px_rgba(255,51,85,0.15)]"
+                }`}
+              >
+                <Avatar
+                  name={data.card_name}
+                  userId={isValidUser ? data.employee_id : null}
+                  photoUrl={employeeInfo?.file_url || null}
+                  userName={employeeInfo?.fullName}
+                  userJob={employeeInfo?.positionName}
+                  size="large"
+                />
+              </div>
+              {/* ID chip */}
+              <div
+                className={`absolute -bottom-2 -right-2 font-mono-cyber text-[9px] font-bold px-1.5 py-0.5 rounded border ${
+                  isDark ? "bg-slate-950" : "bg-white"
+                } ${
+                  isSuccess
+                    ? "border-green-400/40 text-green-400"
+                    : "border-red-500/40 text-red-400"
+                }`}
+              >
+                ID:{data.employee_id || "----"}
+              </div>
+            </div>
+
+            {/* Name + info grid */}
+            <div className="flex-1 min-w-0">
+              <h1
+                className={`font-display text-2xl font-bold mb-3 leading-tight ${
+                  isDark ? "text-slate-100" : "text-slate-900"
+                }`}
+              >
+                {fullName}
+              </h1>
+              {isValidUser && employeeInfo ? (
+                <div className="grid grid-cols-2 gap-2.5">
+                  <InfoTile
+                    icon={<AccountTreeIcon sx={{ fontSize: 15 }} />}
+                    label="Отдел"
+                    value={
+                      employeeInfo.workplace?.organizational_unit?.name || "–"
+                    }
+                    isSuccess={isSuccess}
+                    isDark={isDark}
+                  />
+                  <InfoTile
+                    icon={<PersonOutlineOutlinedIcon sx={{ fontSize: 15 }} />}
+                    label="Должность"
+                    value={employeeInfo.workplace?.position?.name || "–"}
+                    isSuccess={isSuccess}
+                    isDark={isDark}
+                  />
+                  <InfoTile
+                    icon={<MeetingRoomIcon sx={{ fontSize: 15 }} />}
+                    label="Тип двери"
+                    value={data.event_type}
+                    isSuccess={isSuccess}
+                    isDark={isDark}
+                  />
+                  <InfoTile
+                    icon={<AccessTimeOutlinedIcon sx={{ fontSize: 15 }} />}
+                    label="Время прохода"
+                    value={timestamp}
+                    isSuccess={isSuccess}
+                    isDark={isDark}
+                  />
+                </div>
+              ) : (
+                <div className="bg-red-500/[0.06] border border-red-500/20 rounded-xl px-4 py-3">
+                  <p className="text-red-400 font-semibold text-sm">
+                    ⚠️ Нет данных о сотруднике
+                  </p>
+                </div>
               )}
             </div>
           </div>
 
-          <div className="text-center">
+          <CyberDivider isSuccess={isSuccess} />
+        </div>
+
+        {/* ── Status panel — hero element ── */}
+        <div
+          className={`status-glow relative flex items-center gap-5 px-6 py-5 border-t ${
+            isSuccess
+              ? "bg-[linear-gradient(135deg,#001a0d,#002211)] border-green-400/25 [box-shadow:inset_0_0_40px_rgba(0,255,136,0.06)]"
+              : "bg-[linear-gradient(135deg,#1a0008,#220011)] border-red-500/25 [box-shadow:inset_0_0_40px_rgba(255,51,85,0.06)]"
+          }`}
+        >
+          {/* Pulsing rings + icon */}
+          <div className="relative w-20 h-20 flex-shrink-0 flex items-center justify-center">
+            <div
+              className={`ping-ring absolute inset-0 rounded-full ${
+                isSuccess
+                  ? "bg-[radial-gradient(circle,rgba(0,255,136,0.25)_0%,transparent_70%)]"
+                  : "bg-[radial-gradient(circle,rgba(255,51,85,0.25)_0%,transparent_70%)]"
+              }`}
+            />
+            <div
+              className={`ping-ring-2 absolute inset-0 rounded-full ${
+                isSuccess
+                  ? "bg-[radial-gradient(circle,rgba(0,255,136,0.15)_0%,transparent_70%)]"
+                  : "bg-[radial-gradient(circle,rgba(255,51,85,0.15)_0%,transparent_70%)]"
+              }`}
+            />
+            <div
+              className={`relative z-10 w-[68px] h-[68px] rounded-full flex items-center justify-center border-2 ${
+                isSuccess
+                  ? "bg-[radial-gradient(circle_at_35%_35%,rgba(0,255,136,0.3),rgba(0,255,136,0.1))] border-green-400/50 [box-shadow:0_0_30px_rgba(0,255,136,0.4),inset_0_0_15px_rgba(0,255,136,0.15)]"
+                  : "bg-[radial-gradient(circle_at_35%_35%,rgba(255,51,85,0.3),rgba(255,51,85,0.1))] border-red-500/50 [box-shadow:0_0_30px_rgba(255,51,85,0.4),inset_0_0_15px_rgba(255,51,85,0.15)]"
+              }`}
+            >
+              {isSuccess ? (
+                <CheckCircleIcon sx={{ fontSize: 36, color: "#00ff88" }} />
+              ) : (
+                <ReportIcon sx={{ fontSize: 36, color: "#ff3355" }} />
+              )}
+            </div>
+          </div>
+
+          {/* Status text */}
+          <div className="flex-1">
+            <div className="flex items-center gap-1.5 mb-1">
+              <div
+                className={`w-1.5 h-1.5 rounded-full pulse-dot ${
+                  isSuccess
+                    ? "bg-green-400 [box-shadow:0_0_6px_#00ff88]"
+                    : "bg-red-500 [box-shadow:0_0_6px_#ff3355]"
+                }`}
+              />
+              <span
+                className={`font-mono-cyber text-[9px] font-bold tracking-[0.18em] uppercase opacity-60 ${
+                  isSuccess ? "text-green-400" : "text-red-400"
+                }`}
+              >
+                СТАТУС ДОСТУПА
+              </span>
+            </div>
             <p
-              className={`text-xl font-bold uppercase tracking-wide ${
-                isSuccess ? "text-green-700" : "text-red-700"
+              className={`font-display text-3xl font-bold tracking-widest uppercase ${
+                isSuccess
+                  ? "text-green-400 [text-shadow:0_0_20px_rgba(0,255,136,0.6)]"
+                  : "text-red-400 [text-shadow:0_0_20px_rgba(255,51,85,0.6)]"
               }`}
             >
               {isSuccess ? "ПРОХОД РАЗРЕШЕН" : "ПРОХОД ЗАПРЕЩЁН"}
             </p>
-            <p className="text-gray-600 text-sm mt-1">{errorMessage}</p>
+            <p
+              className={`font-mono-cyber text-xs mt-1 opacity-45 ${isSuccess ? "text-green-400" : "text-red-400"}`}
+            >
+              ► {errorMessage}
+            </p>
+          </div>
+
+          {/* Entry/exit badge */}
+          <div
+            className={`flex flex-col items-center gap-1.5 px-4 py-3 rounded-xl border ${
+              isEntry
+                ? "bg-green-400/10 border-green-400/30"
+                : "bg-red-500/10 border-red-500/30"
+            }`}
+          >
+            {isEntry ? (
+              <LoginIcon sx={{ fontSize: 28, color: "#4ade80" }} />
+            ) : (
+              <ExitToAppIcon sx={{ fontSize: 28, color: "#ff3355" }} />
+            )}
+            <span
+              className={` text-[10px] font-bold tracking-widest uppercase ${
+                isEntry ? "text-green-400" : "text-red-400"
+              }`}
+            >
+              {isEntry ? "ВХОД" : "ВЫХОД"}
+            </span>
+          </div>
+
+          {/* Hex error code */}
+          <div className="text-right">
+            <div
+              className={`font-mono-cyber text-[9px] tracking-widest opacity-35 mb-1 ${
+                isSuccess ? "text-green-400" : "text-red-400"
+              }`}
+            >
+              ERR_CODE
+            </div>
+            <div
+              className={`font-mono-cyber text-2xl font-bold opacity-50 ${
+                isSuccess
+                  ? "text-green-400 [text-shadow:0_0_10px_#00ff88]"
+                  : "text-red-400 [text-shadow:0_0_10px_#ff3355]"
+              }`}
+            >
+              {isSuccess ? "0x00" : "0x20"}
+            </div>
           </div>
         </div>
-      </div>
-    </motion.div>
+      </motion.div>
+    </>
   );
 };
 

@@ -13,7 +13,6 @@ import Avatar from "@/components/security-monitor/avatar";
 import ReactPaginate from "react-paginate";
 import ExcelButton from "@/components/button/excel-button";
 import { Typography } from "@mui/material";
-import * as XLSX from "xlsx";
 import ExcelJS from "xlsx-js-style";
 
 export default function LateComers() {
@@ -58,7 +57,6 @@ export default function LateComers() {
       late_list: lastList,
     },
   });
-  
 
   const exportToExcel = (rows, filename) => {
     // 1) Headerlarni olish
@@ -97,13 +95,13 @@ export default function LateComers() {
               right: { style: "thin", color: { argb: "808080" } },
             },
           },
-        }))
+        })),
       ),
     ];
 
     // 3) Sheet yaratish
     const worksheet = ExcelJS.utils.aoa_to_sheet(
-      data.map((row) => row.map((cell) => cell.v))
+      data.map((row) => row.map((cell) => cell.v)),
     );
 
     // Style-ni ulash
@@ -135,95 +133,93 @@ export default function LateComers() {
   };
 
   // excel yuklash handler
-const handleDownloadExcel = async () => {
-  if (isDownloading) return; // Prevent multiple clicks
-  
-  try {
-    setIsDownloading(true);
-    
-    const query = buildQuery({
-      limit: 1000,
-      offset: 0,
-      start: startDate,
-      end: endDate,
-      event_type: eventType,
-      error_code: errorCode,
-      confirmed: confirm,
-      late_list: lastList,
-    });
-    
-    // 1) asosiy API fetch (limit = 1000)
-    const res = await fetch(
-      `${config.PYTHON_API_URL_REPORT}${URLS.getLateComers}?${query}`
-    );
-    const json = await res.json();
-    const lateComers = json?.data || [];
+  const handleDownloadExcel = async () => {
+    if (isDownloading) return; // Prevent multiple clicks
 
-    // 2) xodimlarni olish
-    const uniqueUserIds = [
-      ...new Set(lateComers.map((item) => item.id)),
-    ];
-    const employeesMapExcel = {};
-    await Promise.all(
-      uniqueUserIds.map(async (id) => {
-        try {
-          const empRes = await fetch(
-            `${config.GENERAL_AUTH_URL}staffio/employee/${id}`,
-            {
-              headers: {
-                'Authorization': `Bearer ${session?.accessToken}`
-              }
+    try {
+      setIsDownloading(true);
+
+      const query = buildQuery({
+        limit: 1000,
+        offset: 0,
+        start: startDate,
+        end: endDate,
+        event_type: eventType,
+        error_code: errorCode,
+        confirmed: confirm,
+        late_list: lastList,
+      });
+
+      // 1) asosiy API fetch (limit = 1000)
+      const res = await fetch(
+        `${config.PYTHON_API_URL_REPORT}${URLS.getLateComers}?${query}`,
+      );
+      const json = await res.json();
+      const lateComers = json?.data || [];
+
+      // 2) xodimlarni olish
+      const uniqueUserIds = [...new Set(lateComers.map((item) => item.id))];
+      const employeesMapExcel = {};
+      await Promise.all(
+        uniqueUserIds.map(async (id) => {
+          try {
+            const empRes = await fetch(
+              `${config.GENERAL_AUTH_URL}staffio/employee/${id}`,
+              {
+                headers: {
+                  Authorization: `Bearer ${session?.accessToken}`,
+                },
+              },
+            );
+            if (empRes.ok) {
+              const empJson = await empRes.json();
+              employeesMapExcel[id] = empJson;
+            } else {
+              employeesMapExcel[id] = null;
             }
-          );
-          if (empRes.ok) {
-            const empJson = await empRes.json();
-            employeesMapExcel[id] = empJson;
-          } else {
+          } catch (err) {
             employeesMapExcel[id] = null;
           }
-        } catch (err) {
-          employeesMapExcel[id] = null;
-        }
-      })
-    );
-
-    // 3) excel rows tayyorlash
-    const excelRows = lateComers.map((item, index) => {
-      const employee = employeesMapExcel[item.employee_id];
-      return {
-        id: index + 1,
-        Имя: employee
-        ? `${employee?.first_name} ${employee?.last_name}  ${employee?.middle_name}`
-        : "Неизвестно",
-        Отдел: employee?.workplace?.organizational_unit?.name  || "-",
-        Дата: dayjs(item.real_utc).format("DD.MM.YYYY"),
-        Время: new Date(item.real_utc).toLocaleString("ru-RU", {
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-          timeZone: "Asia/Tashkent",
         }),
-        Дверь: item.event_type,
-        Статус:
-          item.error_code === 0
-            ? "Вовремя"
-            : item.error_code === 32
-            ? "Опоздал"
-            : "Неизвестно",
-        Cтатус_события: item.confirmed
-          ? "Подтверждённый"
-          : "Неподтверждённый",
-      };
-    });
+      );
 
-    // 4) export
-    exportToExcel(excelRows, "Отчёты-КПП.xlsx");
-  } catch (err) {
-    console.error("Excel yuklashda xato:", err);
-  } finally {
-    setIsDownloading(false);
-  }
-};  
+      // 3) excel rows tayyorlash
+      const excelRows = lateComers.map((item, index) => {
+        const employee = employeesMapExcel[item.employee_id];
+        return {
+          id: index + 1,
+          Имя: employee
+            ? `${employee?.first_name} ${employee?.last_name}  ${employee?.middle_name}`
+            : "Неизвестно",
+          Отдел: employee?.workplace?.organizational_unit?.name || "-",
+          Дата: dayjs(item.real_utc).format("DD.MM.YYYY"),
+          Время: new Date(item.real_utc).toLocaleString("ru-RU", {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            timeZone: "Asia/Tashkent",
+          }),
+          Дверь: item.event_type,
+          Статус:
+            item.error_code === 0
+              ? "Вовремя"
+              : item.error_code === 32
+                ? "Опоздал"
+                : "Неизвестно",
+          Cтатус_события: item.confirmed
+            ? "Подтверждённый"
+            : "Неподтверждённый",
+        };
+      });
+
+      // 4) export
+      exportToExcel(excelRows, "Отчёты-КПП.xlsx");
+    } catch (err) {
+      console.error("Excel yuklashda xato:", err);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
   // xodimlar ma’lumotlarini olish
 
   useEffect(() => {
@@ -245,7 +241,7 @@ const handleDownloadExcel = async () => {
                 headers: {
                   Authorization: `Bearer ${session?.accessToken}`,
                 },
-              }
+              },
             );
 
             if (res.ok) {
@@ -258,7 +254,7 @@ const handleDownloadExcel = async () => {
             console.error("Ошибка при загрузке сотрудника:", err);
             results[id] = null;
           }
-        })
+        }),
       );
 
       setEmployeesMap(results);
@@ -268,7 +264,6 @@ const handleDownloadExcel = async () => {
   }, [getLateComers?.data?.data, session?.accessToken]);
 
   console.log(employeesMap);
-  
 
   const rows = useMemo(() => {
     if (!getLateComers?.data?.data) return [];
@@ -280,13 +275,11 @@ const handleDownloadExcel = async () => {
         id: item.id,
         employee_id: item.employee_id,
         index: index + 1,
-        photo: employee?.file_url
-          ? `${employee?.file_url}`
-          : null,
+        photo: employee?.file_url ? `${employee?.file_url}` : null,
         name: employee
           ? `${employee?.first_name} ${employee?.last_name}  ${employee?.middle_name}`
           : "Неизвестно",
-        department: employee?.workplace?.organizational_unit?.name  || "-",
+        department: employee?.workplace?.organizational_unit?.name || "-",
         date: dayjs(item.real_utc).format("DD.MM.YYYY"),
         time: new Date(item.real_utc).toLocaleString("ru-RU", {
           hour: "2-digit",
@@ -299,8 +292,8 @@ const handleDownloadExcel = async () => {
           item.error_code === 0
             ? "Вовремя"
             : item.error_code === 32
-            ? "Опоздал"
-            : "Неизвестно",
+              ? "Опоздал"
+              : "Неизвестно",
       };
     });
   }, [getLateComers?.data?.data, employeesMap]);

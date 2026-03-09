@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import url("https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,opsz,wght@0,6..12,200..1000;1,6..12,200..1000&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&display=swap");
 
 :root {
   --background: #ffffff;
@@ -96,13 +97,21 @@ header {
 }
 
 .login {
-  background: var(--background-login);
-  color: var(--foreground);
+  background: transparent;
+  color: inherit;
   font-family: "DM Sans", sans-serif;
 }
 
 .login .second-part {
   background: linear-gradient(135deg, #1f2e61 0%, #a6acc2 50%, #1f2e61 100%);
+}
+
+.font-mono-cyber {
+  font-family: "Share Tech Mono", monospace !important;
+}
+
+.font-display {
+  font-family: "Rajdhani", sans-serif !important;
 }
 
 .user-rectangle {

@@ -20,7 +20,11 @@ const Input = ({
 
   return (
     <div className={`relative ${classNames}`}>
-      {label && <label className={`${labelClass}`}>{label}</label>}
+      {label && (
+        <label className={`text-slate-700 dark:text-slate-200 ${labelClass}`}>
+          {label}
+        </label>
+      )}
 
       <input
         {...props}
@@ -28,7 +32,7 @@ const Input = ({
         placeholder={placeholder}
         value={value}
         onChange={onChange}
-        className={`w-full h-[55px] border border-gray-400 rounded-[5px] p-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputClass}`}
+        className={`w-full h-[55px] border border-gray-400 rounded-[5px] p-2 pr-10 bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500 ${inputClass}`}
       />
 
       {/* Show/hide toggle */}
@@ -36,7 +40,7 @@ const Input = ({
         <button
           type="button"
           onClick={() => setShowPassword((prev) => !prev)}
-          className="absolute right-3 top-[65%] transform -translate-y-1/2 text-gray-500"
+          className="absolute right-3 top-[65%] transform -translate-y-1/2 text-gray-500 dark:text-slate-400"
         >
           {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
         </button>

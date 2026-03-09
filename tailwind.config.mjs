@@ -19,6 +19,10 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        "mono-cyber": ['"Share Tech Mono"', "monospace"],
+        "display-cyber": ["Rajdhani", "sans-serif"],
+      },
       screens: {
         sm: "640px",
         md: "768px",

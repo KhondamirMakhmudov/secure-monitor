@@ -1,81 +1,179 @@
+"use client";
+
 import Brand from "../brand";
 import { signOut } from "next-auth/react";
 import ExitModal from "../modal/exit-modal";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import ThemeSwitcher from "../theme-select";
 import Link from "next/link";
 import { useRouter } from "next/router";
+import { useTheme } from "next-themes";
+
+const navLinks = [
+  { href: "/secure-section", label: "Система контроля доступа" },
+  { href: "/late-comers", label: "Отчёты" },
+];
 
 const Header = ({ bgColor = "bg-white" }) => {
   const router = useRouter();
+  const { theme } = useTheme();
   const [openExitModal, setOpenExitModal] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const isDark = mounted && theme === "dark";
 
   const handleLogout = () => {
-    signOut({ redirect: true, callbackUrl: "http://10.20.6.30:3000" });
+    signOut({ redirect: true, callbackUrl: "http://11.10.26.30:3000" });
   };
 
-  const handleOpenExitModal = () => setOpenExitModal(false);
-
-  const navLinks = [
-    { href: "/secure-section", label: "Система контроля доступа" },
-    { href: "/late-comers", label: "Отчёты" },
-  ];
-
   return (
-    <div className="w-full">
-      <header
-        className={`w-full ${bgColor} py-4 px-4 rounded-md flex justify-between items-center shadow`}
-      >
-        <Brand />
-        <nav>
-          <ul className="flex gap-6">
-            {navLinks.map(({ href, label }) => {
-              const isActive = router.pathname === href;
-              return (
-                <li key={href}>
-                  <Link
-                    href={href}
-                    className={`relative transition duration-300 
-                      ${
-                        isActive
-                          ? "text-blue-600 font-medium"
-                          : " hover:text-blue-600"
-                      }
-                      after:content-[''] after:absolute after:left-1/2 after:bottom-0 
-                      after:h-[2px] after:w-0 after:bg-blue-600 
-                      after:transition-all after:duration-300 after:-translate-x-1/2
-                      hover:after:w-full ${isActive ? "after:w-full" : ""}`}
-                  >
-                    {label}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
-        <div className="flex items-center gap-2">
-          <ThemeSwitcher />
-          <button
-            onClick={() => setOpenExitModal(true)}
-            className="text-sm bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded transition"
-          >
-            Выход
-          </button>
-        </div>
-        <ExitModal
-          open={openExitModal}
-          onClose={handleOpenExitModal}
-          handleLogout={handleLogout}
-        />
-      </header>
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@600;700&display=swap');
+        .font-mono-cyber { font-family: 'Share Tech Mono', monospace; }
+        .font-display    { font-family: 'Rajdhani', sans-serif; }
+        @keyframes borderPulse {
+          0%, 100% { opacity: 1;   }
+          50%       { opacity: 0.4; }
+        }
+        @keyframes marqueeScroll {
+          0%   { transform: translateX(100%);  }
+          100% { transform: translateX(-100%); }
+        }
+        .pulse-dot      { animation: borderPulse 1.5s ease-in-out infinite; }
+        .cyber-marquee  { animation: marqueeScroll 22s linear infinite; white-space: nowrap; }
+      `}</style>
 
-      {/* Marquee */}
-      <div className="w-full bg-yellow-100 text-yellow-800 py-1 mt-2 rounded">
-        <marquee behavior="scroll" direction="left">
-          Сайт работает в тестовом режиме
-        </marquee>
+      <div className="w-full">
+        {/* ── Main header bar ── */}
+        <header
+          className={`relative w-full overflow-hidden rounded-2xl px-4 py-3 sm:px-5 sm:py-4 ${
+            isDark
+              ? "bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 border border-white/[0.07] text-slate-100 [box-shadow:0_4px_32px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.03)]"
+              : "bg-gradient-to-br from-white via-slate-50 to-white border border-slate-200 text-slate-800 [box-shadow:0_4px_32px_rgba(0,0,0,0.08),0_0_0_1px_rgba(15,23,42,0.02)]"
+          }`}
+        >
+          {/* Corner brackets */}
+          <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-sky-500/60 [box-shadow:0_0_6px_rgba(56,189,248,0.4)]" />
+          <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-sky-500/60 [box-shadow:0_0_6px_rgba(56,189,248,0.4)]" />
+          <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-sky-500/60 [box-shadow:0_0_6px_rgba(56,189,248,0.4)]" />
+          <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-sky-500/60 [box-shadow:0_0_6px_rgba(56,189,248,0.4)]" />
+
+          {/* Ambient glow */}
+          <div
+            className={`absolute inset-0 pointer-events-none ${
+              isDark
+                ? "bg-[radial-gradient(ellipse_at_50%_0%,rgba(56,189,248,0.04)_0%,transparent_60%)]"
+                : "bg-[radial-gradient(ellipse_at_50%_0%,rgba(56,189,248,0.06)_0%,transparent_60%)]"
+            }`}
+          />
+
+          <div className="relative flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            {/* Brand */}
+            <Brand />
+
+            {/* Nav */}
+            <nav className="w-full lg:w-auto">
+              <ul className="flex flex-wrap items-center gap-1 sm:gap-2">
+                {navLinks.map(({ href, label }) => {
+                  const isActive = router.pathname === href;
+                  return (
+                    <li key={href}>
+                      <Link
+                        href={href}
+                        className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono-cyber text-xs tracking-widest uppercase transition-all duration-200 ${
+                          isActive
+                            ? isDark
+                              ? "bg-sky-500/10 border border-sky-500/40 text-sky-300 [box-shadow:0_0_12px_rgba(56,189,248,0.15)]"
+                              : "bg-sky-100 border border-sky-300 text-sky-700"
+                            : isDark
+                              ? "border border-transparent text-slate-400 hover:text-sky-300 hover:border-sky-500/25 hover:bg-sky-500/[0.06]"
+                              : "border border-transparent text-slate-600 hover:text-sky-600 hover:border-sky-300 hover:bg-sky-50"
+                        }`}
+                      >
+                        {isActive && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-sky-400 pulse-dot [box-shadow:0_0_6px_#38bdf8]" />
+                        )}
+                        {label}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </nav>
+
+            {/* Actions */}
+            <div className="flex items-center gap-2 self-start lg:self-auto">
+              <ThemeSwitcher />
+
+              {/* Logout button */}
+              <button
+                onClick={() => setOpenExitModal(true)}
+                className={`relative overflow-hidden flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono-cyber text-xs tracking-widest uppercase border border-red-500/30 transition-all duration-200 hover:border-red-400/60 hover:bg-red-500/10 hover:[box-shadow:0_0_16px_rgba(255,51,85,0.2)] hover:scale-[1.02] active:scale-[0.98] [box-shadow:0_0_0_1px_rgba(255,51,85,0.08)] sm:px-4 ${
+                  isDark ? "text-red-400 bg-slate-900" : "text-red-500 bg-white"
+                }`}
+              >
+                <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_50%_0%,rgba(255,51,85,0.07)_0%,transparent_60%)]" />
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="relative"
+                >
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+                <span className="relative">Выход</span>
+              </button>
+            </div>
+          </div>
+
+          <ExitModal
+            open={openExitModal}
+            onClose={() => setOpenExitModal(false)}
+            handleLogout={handleLogout}
+          />
+        </header>
+
+        {/* ── Marquee strip ── */}
+        <div className="relative mt-2 w-full overflow-hidden rounded-lg border border-yellow-500/20 bg-yellow-500/[0.06] py-1.5 [box-shadow:0_0_12px_rgba(234,179,8,0.08)]">
+          {/* Edge fades */}
+          <div
+            className={`absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r to-transparent z-10 pointer-events-none ${
+              isDark ? "from-slate-950" : "from-white"
+            }`}
+          />
+          <div
+            className={`absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l to-transparent z-10 pointer-events-none ${
+              isDark ? "from-slate-950" : "from-white"
+            }`}
+          />
+
+          <div className="flex items-center gap-3 px-4">
+            <span className="flex-shrink-0 font-mono-cyber text-[9px] font-bold tracking-[0.2em] uppercase text-yellow-500/70 border border-yellow-500/30 px-2 py-0.5 rounded">
+              ИНФО
+            </span>
+            <div className="overflow-hidden flex-1">
+              <p className="cyber-marquee font-mono-cyber text-[11px] text-yellow-400/70 tracking-widest">
+                ⚠ &nbsp; Сайт работает в тестовом режиме &nbsp; · &nbsp; Сайт
+                работает в тестовом режиме &nbsp; · &nbsp; Сайт работает в
+                тестовом режиме
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 
