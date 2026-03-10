@@ -18,7 +18,7 @@ request.interceptors.response.use(
   },
   (error) => {
     return Promise.reject(error);
-  }
+  },
 );
 
 const requestPython = axios.create({
@@ -38,7 +38,7 @@ requestPython.interceptors.response.use(
   },
   (error) => {
     return Promise.reject(error);
-  }
+  },
 );
 
 const requestGeneralAuth = axios.create({
@@ -58,7 +58,27 @@ requestGeneralAuth.interceptors.response.use(
   },
   (error) => {
     return Promise.reject(error);
-  }
+  },
 );
 
-export { request, requestPython, requestGeneralAuth };
+const requestEventTracker = axios.create({
+  baseURL: config.EVENT_TRACKER_URL,
+  params: {},
+  headers: {
+    common: {
+      Accept: "application/json",
+      "Content-Type": "application/json; charset=utf-8",
+    },
+  },
+});
+
+requestEventTracker.interceptors.response.use(
+  (response) => {
+    return response;
+  },
+  (error) => {
+    return Promise.reject(error);
+  },
+);
+
+export { request, requestPython, requestGeneralAuth, requestEventTracker };

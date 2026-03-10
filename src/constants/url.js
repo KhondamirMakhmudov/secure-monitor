@@ -3,4 +3,6 @@ export const URLS = {
   getDevices: "api/v1/devices",
   openDoor: "api/v1/open_door",
   getLateComers: "api/v1/event/get_last",
+
+  reports: "events",
 };
