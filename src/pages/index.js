@@ -10,6 +10,8 @@ import { motion } from "framer-motion";
 import ContentLoader from "@/components/loader";
 import ThemeSwitcher from "@/components/theme-select";
 import { useTheme } from "next-themes";
+import LoginRoundedIcon from "@mui/icons-material/LoginRounded";
+import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 
 export default function Home() {
   const { data: session, status } = useSession();
@@ -281,7 +283,7 @@ export default function Home() {
                     {/* if logged in */}
                     {status === "authenticated" ? (
                       <motion.div
-                        className="flex flex-col sm:flex-row gap-4 w-full"
+                        className="flex flex-col sm:flex-row gap-2 w-full"
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.5, delay: 0.6 }}
@@ -289,29 +291,41 @@ export default function Home() {
                         <motion.div
                           whileHover={{ scale: 1.02, y: -2 }}
                           whileTap={{ scale: 0.98 }}
-                          className="flex-1"
+                          className="w-full"
                         >
                           <Button
                             type="button"
-                            sx={{ width: "100%", height: "52px" }}
+                            fullWidth
+                            className="min-h-[52px]"
                             onClick={handleEnter}
                             disabled={isLoading}
+                            icon={
+                              !isLoading ? (
+                                <LoginRoundedIcon fontSize="inherit" />
+                              ) : null
+                            }
                           >
-                            {isLoading ? "Загрузка..." : "→ Войти в систему"}
+                            {isLoading ? "Загрузка..." : "Войти в систему"}
                           </Button>
                         </motion.div>
                         <motion.div
                           whileHover={{ scale: 1.02, y: -2 }}
                           whileTap={{ scale: 0.98 }}
-                          className="flex-1"
+                          className="w-full"
                         >
                           <Button
                             type="button"
-                            sx={{ width: "100%", height: "52px" }}
+                            fullWidth
+                            className="min-h-[52px]"
                             onClick={handleExit}
                             disabled={isLoading}
+                            icon={
+                              !isLoading ? (
+                                <LogoutRoundedIcon fontSize="inherit" />
+                              ) : null
+                            }
                           >
-                            {isLoading ? "Загрузка..." : "← Выйти"}
+                            {isLoading ? "Загрузка..." : "Выйти"}
                           </Button>
                         </motion.div>
                       </motion.div>
