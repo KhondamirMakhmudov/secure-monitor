@@ -7,4 +7,5 @@ export const URLS = {
   reports: "events",
   sessionOfTheEmployee: "filter-sessions",
   orgUnit: "organizational-unit/",
+  tardiness: "reports/tardiness",
 };

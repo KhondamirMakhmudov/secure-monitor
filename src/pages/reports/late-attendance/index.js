@@ -19,9 +19,8 @@ const Index = () => {
   const [selectedUnitId, setSelectedUnitId] = useState(null);
   const [filterSessionId, setFilterSessionId] = useState(null);
   const [startDate, setStartDate] = useState(
-    new Date().toISOString().slice(0, 16),
+    new Date().toISOString().slice(0, 10),
   );
-  const [endDate, setEndDate] = useState(new Date().toISOString().slice(0, 16));
 
   // LEVEL 1 - Root units
   const { data: level1List, isLoading: level1Loading } = useGetQuery({
@@ -115,14 +114,30 @@ const Index = () => {
     listKeyId: "sessionOfTheEmployee",
     apiClient: requestEventTracker,
     onSuccess: (data) => {
-      // Set the filterSessionId from the response
-      setFilterSessionId(data?.filterSessionId);
+      console.log("=== MUTATION SUCCESS ===");
+      console.log("Full response data:", data);
+      console.log("Response keys:", Object.keys(data || {}));
+      console.log("filterSessionId from response:", data?.filterSessionId);
+
+      // Try different possible response structures
+      const sessionId =
+        data?.filterSessionId ||
+        data?.sessionId ||
+        data?.session_id ||
+        data?.id;
+      console.log("Extracted session ID:", sessionId);
+
+      setFilterSessionId(sessionId);
+    },
+    onError: (error) => {
+      console.error("=== MUTATION ERROR ===", error);
+      console.error("Error details:", error?.response?.data);
     },
   });
 
   // TARDINESS DATA - Fetch tardiness data using filterSessionId
   const { data: tardinessData, isLoading: tardinessLoading } = useGetQuery({
-    key: ["tardiness", filterSessionId, startDate, endDate],
+    key: ["tardiness", filterSessionId, startDate],
     url: URLS.tardiness,
     apiClient: requestEventTracker,
     headers: {
@@ -130,9 +145,8 @@ const Index = () => {
       Authorization: `Bearer ${session?.accessToken}`,
     },
     params: {
+      date: startDate?.split("T")[0], // Convert to YYYY-MM-DD format
       filter_session_id: filterSessionId,
-      start_date: startDate,
-      end_date: endDate,
     },
     enabled: !!filterSessionId && !!session?.accessToken,
   });
@@ -187,12 +201,19 @@ const Index = () => {
 
   const workplaceData = unitDetailData?.workplace || [];
 
-  // Auto-trigger employee click when workplaceData is available
   useEffect(() => {
     if (workplaceData && workplaceData.length > 0) {
       handleEmployeeClick();
     }
-  }, [workplaceData]);
+  }, [workplaceData, sessionofSelectedEmployee]);
+
+  // Manual trigger for tardiness API - if filterSessionId not set, trigger mutation manually
+  useEffect(() => {
+    if (selectedUnitId && !filterSessionId && workplaceData.length > 0) {
+      console.log("=== MANUAL MUTATION TRIGGER ===");
+      handleEmployeeClick();
+    }
+  }, [selectedUnitId]);
 
   const tardinessDataList = tardinessData?.data || tardinessData || [];
 
@@ -267,27 +288,16 @@ const Index = () => {
         />
       </div>
 
-      {/* Date Range Filters */}
+      {/* Date Filter */}
       <div className="mb-6 grid grid-cols-12 gap-4">
         <div className="col-span-3">
           <label className="block text-sm font-mono-cyber text-slate-400 mb-2">
-            Начальная дата
+            Дата отчёта
           </label>
           <input
-            type="datetime-local"
+            type="date"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
-            className="w-full px-3 py-2 bg-slate-900 border border-white/[0.1] rounded-lg text-sm text-slate-300 font-mono-cyber focus:outline-none focus:border-sky-500/50"
-          />
-        </div>
-        <div className="col-span-3">
-          <label className="block text-sm font-mono-cyber text-slate-400 mb-2">
-            Конечная дата
-          </label>
-          <input
-            type="datetime-local"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
             className="w-full px-3 py-2 bg-slate-900 border border-white/[0.1] rounded-lg text-sm text-slate-300 font-mono-cyber focus:outline-none focus:border-sky-500/50"
           />
         </div>

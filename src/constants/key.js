@@ -3,4 +3,5 @@ export const KEYS = {
   getDevices: "getDevices",
   getLateComers: "getLateComers",
   orgUnit: "orgUnit",
+  tardiness: "tardiness",
 };
