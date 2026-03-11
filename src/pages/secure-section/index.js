@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import ConnectionStatus from "@/components/security-monitor/connection-status";
 import Image from "next/image";
 import NewUnifiedPanel from "@/components/security-monitor/new-unified-model";
@@ -96,6 +96,9 @@ const Index = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [statusText, setStatusText] = useState("Не подключен");
   const [devices, setDevices] = useState([]);
+  const wsRef = useRef(null);
+  const reconnectTimeoutRef = useRef(null);
+  const hasInitializedRef = useRef(false);
 
   // Fetch devices
   useEffect(() => {
@@ -134,50 +137,73 @@ const Index = () => {
 
   // ── WebSocket — DO NOT TOUCH ──────────────────────────────────────────────
   useEffect(() => {
-    let ws = null;
-    let isClosed = false;
+    // Only initialize once
+    if (hasInitializedRef.current) return;
+    hasInitializedRef.current = true;
+
+    let reconnectAttempts = 0;
+    const MAX_RECONNECT_ATTEMPTS = 10;
+    const INITIAL_RECONNECT_DELAY = 2000; // 2 seconds
 
     const connectWebSocket = () => {
-      ws = new WebSocket(
-        "ws://10.20.6.60:2022/api/v1/events/ws?entry_point_id=2",
-      );
+      try {
+        wsRef.current = new WebSocket(config.WEBSOCKET_URL);
 
-      ws.onopen = () => {
-        if (!isClosed) {
+        wsRef.current.onopen = () => {
           console.log("✅ WebSocket соединение установлено");
           setIsConnected(true);
           setStatusText("Подключено и контролируется");
-        }
-      };
+          reconnectAttempts = 0; // Reset attempts on successful connection
+        };
 
-      ws.onmessage = (event) => {
-        if (isClosed) return;
-        try {
-          const json = JSON.parse(event.data);
-          setMessages((prev) => [json, ...prev.slice(0, 200)]);
-        } catch (e) {}
-      };
+        wsRef.current.onmessage = (event) => {
+          try {
+            const json = JSON.parse(event.data);
+            setMessages((prev) => [json, ...prev.slice(0, 200)]);
+          } catch (e) {
+            console.error("Error parsing WebSocket message:", e);
+          }
+        };
 
-      ws.onclose = () => {
-        if (!isClosed) {
+        wsRef.current.onclose = () => {
           console.log("❌ WebSocket соединение закрыто");
           setIsConnected(false);
           setStatusText("Не подключен");
-        }
-      };
+          attemptReconnect();
+        };
 
-      ws.onerror = (error) => {
-        if (!isClosed) {
+        wsRef.current.onerror = (error) => {
           console.error("💥 Ошибка WebSocket:", error);
           setStatusText("Ошибка соединения");
-        }
-      };
+        };
+      } catch (error) {
+        console.error("Error creating WebSocket:", error);
+        attemptReconnect();
+      }
+    };
+
+    const attemptReconnect = () => {
+      if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+        const delay = INITIAL_RECONNECT_DELAY * Math.pow(2, reconnectAttempts);
+        console.log(
+          `Попытка переподключения ${reconnectAttempts + 1}/${MAX_RECONNECT_ATTEMPTS} через ${delay}ms`,
+        );
+        reconnectAttempts++;
+        reconnectTimeoutRef.current = setTimeout(connectWebSocket, delay);
+      } else {
+        console.error("❌ Не удалось подключиться после максимума попыток");
+        setStatusText("Ошибка соединения (макс. попыток)");
+      }
     };
 
     connectWebSocket();
+
     return () => {
-      isClosed = true;
-      if (ws) ws.close();
+      if (reconnectTimeoutRef.current)
+        clearTimeout(reconnectTimeoutRef.current);
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
     };
   }, []);
   // ── End WebSocket ─────────────────────────────────────────────────────────

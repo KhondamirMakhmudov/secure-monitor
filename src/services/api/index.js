@@ -22,7 +22,7 @@ request.interceptors.response.use(
 );
 
 const requestPython = axios.create({
-  baseURL: config.PYTHON_API_URL_REPORT,
+  baseURL: config.STAFFIO_URL,
   params: {},
   headers: {
     common: {

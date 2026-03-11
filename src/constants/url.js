@@ -5,4 +5,6 @@ export const URLS = {
   getLateComers: "api/v1/event/get_last",
 
   reports: "events",
+  sessionOfTheEmployee: "filter-sessions",
+  orgUnit: "organizational-unit/",
 };
