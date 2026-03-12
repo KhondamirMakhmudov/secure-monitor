@@ -4,7 +4,7 @@ import { URLS } from "@/constants/url";
 import useGetQuery from "@/hooks/all/useGetQuery";
 import { requestEventTracker, requestPython } from "@/services/api";
 import { useSession } from "next-auth/react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import { CustomTable } from "@/components/reports";
@@ -12,6 +12,7 @@ import usePostQuery from "@/hooks/all/usePostQuery";
 
 const Index = () => {
   const { data: session } = useSession();
+
   const [openLevel1Id, setOpenLevel1Id] = useState(null);
   const [openLevel2Id, setOpenLevel2Id] = useState(null);
   const [openLevel3Id, setOpenLevel3Id] = useState(null);
@@ -22,7 +23,11 @@ const Index = () => {
     new Date().toISOString().slice(0, 10),
   );
 
-  // LEVEL 1 - Root units
+  // Track last employee IDs sent to avoid duplicate mutation calls
+  const lastSentEmployeeIdsRef = useRef(null);
+
+  // ─── LEVEL QUERIES ────────────────────────────────────────────────────────
+
   const { data: level1List, isLoading: level1Loading } = useGetQuery({
     key: KEYS.orgUnit,
     url: URLS.orgUnit,
@@ -31,20 +36,10 @@ const Index = () => {
       "Content-Type": "application/json",
       Authorization: `Bearer ${session?.accessToken}`,
     },
-    params: {
-      is_root: true,
-      limit: 150,
-    },
+    params: { is_root: true, limit: 150 },
     enabled: !!session?.accessToken,
   });
 
-  console.log("=== LEVEL 1 ===");
-  console.log("level1Loading:", level1Loading);
-  console.log("level1List:", level1List);
-  console.log("type of level1List:", typeof level1List);
-  console.log("is array?:", Array.isArray(level1List));
-
-  // LEVEL 2 - Level 1 child
   const { data: level2List, isLoading: level2Loading } = useGetQuery({
     key: [KEYS.orgUnit, openLevel1Id],
     url: URLS.orgUnit,
@@ -57,7 +52,6 @@ const Index = () => {
     enabled: !!openLevel1Id && !!session?.accessToken,
   });
 
-  // LEVEL 3 - Level 2 child
   const { data: level3List, isLoading: level3Loading } = useGetQuery({
     key: [KEYS.orgUnit, openLevel2Id],
     url: URLS.orgUnit,
@@ -70,7 +64,6 @@ const Index = () => {
     enabled: !!openLevel2Id && !!session?.accessToken,
   });
 
-  // LEVEL 4 - Level 3 child
   const { data: level4List, isLoading: level4Loading } = useGetQuery({
     key: [KEYS.orgUnit, openLevel3Id],
     url: URLS.orgUnit,
@@ -83,7 +76,6 @@ const Index = () => {
     enabled: !!openLevel3Id && !!session?.accessToken,
   });
 
-  // LEVEL 5 - Level 4 child
   const { data: level5List, isLoading: level5Loading } = useGetQuery({
     key: [KEYS.orgUnit, openLevel4Id],
     url: URLS.orgUnit,
@@ -96,46 +88,118 @@ const Index = () => {
     enabled: !!openLevel4Id && !!session?.accessToken,
   });
 
-  // SELECTED UNIT - Get selected unit details with employees
-  const { data: selectedUnitData, isLoading: selectedUnitLoading } =
-    useGetQuery({
-      key: [KEYS.orgUnit, "detail", selectedUnitId],
-      url: selectedUnitId ? `${URLS.orgUnit}` : null,
-      apiClient: requestPython,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${session?.accessToken}`,
-      },
-      params: { id: selectedUnitId },
-      enabled: !!selectedUnitId && !!session?.accessToken,
-    });
+  // ─── SELECTED UNIT DETAIL ─────────────────────────────────────────────────
+
+  const { data: selectedUnitData } = useGetQuery({
+    key: [KEYS.orgUnit, "detail", selectedUnitId],
+    url: URLS.orgUnit,
+    apiClient: requestPython,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${session?.accessToken}`,
+    },
+    params: { id: selectedUnitId },
+    enabled: !!selectedUnitId && !!session?.accessToken,
+  });
+
+  // ─── DERIVE FLAT DATA ─────────────────────────────────────────────────────
+
+  const level1Data = level1List?.data ?? level1List ?? [];
+  const level2Data = level2List?.data ?? level2List ?? [];
+  const level3Data = level3List?.data ?? level3List ?? [];
+  const level4Data = level4List?.data ?? level4List ?? [];
+  const level5Data = level5List?.data ?? level5List ?? [];
+
+  const findUnitInTree = useCallback(
+    (unitId) => {
+      for (const levelData of [
+        level1Data,
+        level2Data,
+        level3Data,
+        level4Data,
+        level5Data,
+      ]) {
+        if (Array.isArray(levelData)) {
+          const found = levelData.find((item) => item.id === unitId);
+          if (found) return found;
+        }
+      }
+      return null;
+    },
+    [level1Data, level2Data, level3Data, level4Data, level5Data],
+  );
+
+  let unitDetailData = selectedUnitData?.data ?? selectedUnitData;
+  if (!unitDetailData?.workplace) {
+    unitDetailData = findUnitInTree(selectedUnitId);
+  }
+
+  const workplaceData = unitDetailData?.workplace ?? [];
+
+  // ─── SESSION MUTATION ─────────────────────────────────────────────────────
 
   const { mutate: sessionofSelectedEmployee } = usePostQuery({
     listKeyId: "sessionOfTheEmployee",
     apiClient: requestEventTracker,
     onSuccess: (data) => {
-      console.log("=== MUTATION SUCCESS ===");
-      console.log("Full response data:", data);
-      console.log("Response keys:", Object.keys(data || {}));
-      console.log("filterSessionId from response:", data?.filterSessionId);
+      // Log raw response so you can confirm the correct key name
+      console.log("Mutation raw response:", JSON.stringify(data));
 
-      // Try different possible response structures
+      // Support all common casing variants — update once you see the real key
       const sessionId =
-        data?.filterSessionId ||
-        data?.sessionId ||
-        data?.session_id ||
-        data?.id;
-      console.log("Extracted session ID:", sessionId);
+        data?.filter_session_id ??
+        data?.filterSessionId ??
+        data?.session_id ??
+        data?.sessionId ??
+        data?.id ??
+        null;
 
-      setFilterSessionId(sessionId);
+      if (sessionId) {
+        setFilterSessionId(sessionId);
+      } else {
+        console.warn(
+          "Could not extract session ID from mutation response. " +
+            "Check the console log above for the correct key name.",
+        );
+      }
     },
     onError: (error) => {
-      console.error("=== MUTATION ERROR ===", error);
-      console.error("Error details:", error?.response?.data);
+      console.error("Session mutation error:", error?.response?.data ?? error);
     },
   });
 
-  // TARDINESS DATA - Fetch tardiness data using filterSessionId
+  // ─── FIRE MUTATION WHEN workplaceData CHANGES ─────────────────────────────
+  // Uses a ref to prevent re-firing when the mutate reference changes,
+  // and skips duplicate calls for the same employee list.
+
+  useEffect(() => {
+    if (!workplaceData || workplaceData.length === 0) return;
+
+    const employeeIds = workplaceData.map((item) => item.employee_id);
+    const serialized = JSON.stringify(employeeIds);
+
+    // Skip if we already sent the exact same list
+    if (lastSentEmployeeIdsRef.current === serialized) return;
+    lastSentEmployeeIdsRef.current = serialized;
+
+    // Reset previous session so tardiness query doesn't fire stale data
+    setFilterSessionId(null);
+
+    sessionofSelectedEmployee({
+      url: URLS.sessionOfTheEmployee,
+      attributes: { employeeIds },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session?.accessToken}`,
+      },
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workplaceData]);
+  // NOTE: intentionally excluding `sessionofSelectedEmployee` and `session`
+  // from deps — they change every render and would cause infinite loops.
+
+  // ─── TARDINESS QUERY ──────────────────────────────────────────────────────
+
   const { data: tardinessData, isLoading: tardinessLoading } = useGetQuery({
     key: ["tardiness", filterSessionId, startDate],
     url: URLS.tardiness,
@@ -145,139 +209,86 @@ const Index = () => {
       Authorization: `Bearer ${session?.accessToken}`,
     },
     params: {
-      date: startDate?.split("T")[0], // Convert to YYYY-MM-DD format
+      date: startDate?.split("T")[0],
       filter_session_id: filterSessionId,
     },
     enabled: !!filterSessionId && !!session?.accessToken,
   });
 
-  // When workplaceData changes, automatically send employee IDs
-  const handleEmployeeClick = () => {
-    if (workplaceData && workplaceData.length > 0) {
-      const employeeIds = workplaceData.map((item) => item.employee_id);
-      sessionofSelectedEmployee({
-        url: URLS.sessionOfTheEmployee,
-        attributes: {
-          employeeIds: employeeIds,
-        },
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session?.accessToken}`,
-        },
-      });
-    }
+  const tardinessDataList = tardinessData?.data ?? tardinessData ?? [];
+
+  // ─── UNIT SELECT HANDLER ──────────────────────────────────────────────────
+
+  const handleNodeClick = useCallback((item, level) => {
+    // Reset sent-ref so new unit triggers a fresh mutation
+    lastSentEmployeeIdsRef.current = null;
+
+    setSelectedUnitId(item.id);
+    setFilterSessionId(null);
+
+    if (level === 1)
+      setOpenLevel1Id((prev) => (prev === item.id ? null : item.id));
+    else if (level === 2)
+      setOpenLevel2Id((prev) => (prev === item.id ? null : item.id));
+    else if (level === 3)
+      setOpenLevel3Id((prev) => (prev === item.id ? null : item.id));
+    else if (level === 4)
+      setOpenLevel4Id((prev) => (prev === item.id ? null : item.id));
+  }, []);
+
+  // ─── TREE NODE ────────────────────────────────────────────────────────────
+
+  const isLevelOpen = (level, id) => {
+    if (level === 1) return openLevel1Id === id;
+    if (level === 2) return openLevel2Id === id;
+    if (level === 3) return openLevel3Id === id;
+    if (level === 4) return openLevel4Id === id;
+    return false;
   };
 
-  // Helper function to find unit in nested structure
-  const findUnitInTree = (unitId, data, allLevels) => {
-    // Check in all level data
-    for (let levelData of allLevels) {
-      if (Array.isArray(levelData)) {
-        const found = levelData.find((item) => item.id === unitId);
-        if (found) return found;
-      }
-    }
-    return null;
-  };
+  const TreeNode = ({ item, level, hasChildren }) => {
+    const isSelected = selectedUnitId === item.id;
+    const isOpen = isLevelOpen(level, item.id);
 
-  // Extract data from response object
-  const level1Data = level1List?.data || level1List || [];
-  const level2Data = level2List?.data || level2List || [];
-  const level3Data = level3List?.data || level3List || [];
-  const level4Data = level4List?.data || level4List || [];
-  const level5Data = level5List?.data || level5List || [];
-
-  // Try to get unit from API first, then fallback to finding in tree
-  let unitDetailData = selectedUnitData?.data || selectedUnitData;
-  if (!unitDetailData || !unitDetailData.workplace) {
-    unitDetailData = findUnitInTree(selectedUnitId, null, [
-      level1Data,
-      level2Data,
-      level3Data,
-      level4Data,
-      level5Data,
-    ]);
-  }
-
-  const workplaceData = unitDetailData?.workplace || [];
-
-  useEffect(() => {
-    if (workplaceData && workplaceData.length > 0) {
-      handleEmployeeClick();
-    }
-  }, [workplaceData, sessionofSelectedEmployee]);
-
-  // Manual trigger for tardiness API - if filterSessionId not set, trigger mutation manually
-  useEffect(() => {
-    if (selectedUnitId && !filterSessionId && workplaceData.length > 0) {
-      console.log("=== MANUAL MUTATION TRIGGER ===");
-      handleEmployeeClick();
-    }
-  }, [selectedUnitId]);
-
-  const tardinessDataList = tardinessData?.data || tardinessData || [];
-
-  const TreeNode = ({ item, level, onSelect, isSelected, hasChildren }) => (
-    <div style={{ paddingLeft: `${(level - 1) * 16}px`, marginTop: "4px" }}>
-      <button
-        onClick={() => {
-          if (level === 1)
-            setOpenLevel1Id(openLevel1Id === item.id ? null : item.id);
-          else if (level === 2)
-            setOpenLevel2Id(openLevel2Id === item.id ? null : item.id);
-          else if (level === 3)
-            setOpenLevel3Id(openLevel3Id === item.id ? null : item.id);
-          else if (level === 4)
-            setOpenLevel4Id(openLevel4Id === item.id ? null : item.id);
-          setSelectedUnitId(item.id);
-        }}
-        className={`w-full flex items-start gap-2 px-3 py-2 rounded-lg text-left transition-all ${
-          isSelected
-            ? "bg-sky-500/20 border border-sky-500/40 text-sky-400"
-            : "hover:bg-white/[0.03] text-slate-300"
-        }`}
-      >
-        {hasChildren ? (
-          level === 1 && openLevel1Id === item.id ? (
-            <ExpandMoreIcon
-              sx={{ fontSize: 18 }}
-              className="flex-shrink-0 mt-0.5"
-            />
-          ) : level === 2 && openLevel2Id === item.id ? (
-            <ExpandMoreIcon
-              sx={{ fontSize: 18 }}
-              className="flex-shrink-0 mt-0.5"
-            />
-          ) : level === 3 && openLevel3Id === item.id ? (
-            <ExpandMoreIcon
-              sx={{ fontSize: 18 }}
-              className="flex-shrink-0 mt-0.5"
-            />
-          ) : level === 4 && openLevel4Id === item.id ? (
-            <ExpandMoreIcon
-              sx={{ fontSize: 18 }}
-              className="flex-shrink-0 mt-0.5"
-            />
+    return (
+      <div style={{ paddingLeft: `${(level - 1) * 16}px`, marginTop: "4px" }}>
+        <button
+          onClick={() => handleNodeClick(item, level)}
+          className={`w-full flex items-start gap-2 px-3 py-2 rounded-lg text-left transition-all ${
+            isSelected
+              ? "bg-sky-500/20 border border-sky-500/40 text-sky-400"
+              : "hover:bg-white/[0.03] text-slate-300"
+          }`}
+        >
+          {hasChildren ? (
+            isOpen ? (
+              <ExpandMoreIcon
+                sx={{ fontSize: 18 }}
+                className="flex-shrink-0 mt-0.5"
+              />
+            ) : (
+              <ChevronRightIcon
+                sx={{ fontSize: 18 }}
+                className="flex-shrink-0 mt-0.5"
+              />
+            )
           ) : (
-            <ChevronRightIcon
-              sx={{ fontSize: 18 }}
-              className="flex-shrink-0 mt-0.5"
-            />
-          )
-        ) : (
-          <div className="w-6 flex-shrink-0" />
-        )}
-        <div className="flex-1 min-w-0">
-          <p className="font-mono-cyber text-sm break-words whitespace-normal">
-            {item.name}
-          </p>
-          <p className="font-mono-cyber text-xs text-slate-600 break-words whitespace-normal">
-            {item.unit_code}
-          </p>
-        </div>
-      </button>
-    </div>
-  );
+            <div className="w-6 flex-shrink-0" />
+          )}
+          <div className="flex-1 min-w-0">
+            <p className="font-mono-cyber text-sm break-words whitespace-normal">
+              {item.name}
+            </p>
+            <p className="font-mono-cyber text-xs text-slate-600 break-words whitespace-normal">
+              {item.unit_code}
+            </p>
+          </div>
+        </button>
+      </div>
+    );
+  };
+
+  // ─── RENDER ───────────────────────────────────────────────────────────────
 
   return (
     <div>
@@ -297,161 +308,124 @@ const Index = () => {
           <input
             type="date"
             value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
+            onChange={(e) => {
+              setStartDate(e.target.value);
+              // Re-trigger tardiness fetch for new date with same session
+            }}
             className="w-full px-3 py-2 bg-slate-900 border border-white/[0.1] rounded-lg text-sm text-slate-300 font-mono-cyber focus:outline-none focus:border-sky-500/50"
           />
         </div>
       </div>
 
       <div className="grid grid-cols-12 gap-4">
-        {/* Left sidebar - Organizational structure */}
+        {/* Left sidebar */}
         <div className="col-span-3">
           <div className="rounded-2xl bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 border border-white/[0.07] p-4 [box-shadow:0_4px_24px_rgba(0,0,0,0.4)] max-h-[600px] overflow-y-auto">
             <h3 className="font-display text-sm font-semibold text-slate-300 mb-3 px-3">
               Структура организации
             </h3>
 
-            {/* Level 1 */}
-            <div>
-              {level1Loading ? (
-                <p className="text-xs text-slate-600 px-3 py-2">Загрузка...</p>
-              ) : level1Data &&
-                Array.isArray(level1Data) &&
-                level1Data.length > 0 ? (
-                level1Data.map((item) => (
-                  <div key={item.id}>
-                    <TreeNode
-                      item={item}
-                      level={1}
-                      isSelected={selectedUnitId === item.id}
-                      hasChildren={true}
-                    />
+            {level1Loading ? (
+              <p className="text-xs text-slate-600 px-3 py-2">Загрузка...</p>
+            ) : Array.isArray(level1Data) && level1Data.length > 0 ? (
+              level1Data.map((item1) => (
+                <div key={item1.id}>
+                  <TreeNode item={item1} level={1} hasChildren />
 
-                    {/* Level 2 */}
-                    {openLevel1Id === item.id && (
-                      <div>
-                        {level2Loading ? (
-                          <p className="text-xs text-slate-600 ml-8 py-2">
-                            Загрузка...
-                          </p>
-                        ) : level2Data &&
-                          Array.isArray(level2Data) &&
-                          level2Data.length > 0 ? (
-                          level2Data.map((item2) => (
-                            <div key={item2.id}>
-                              <TreeNode
-                                item={item2}
-                                level={2}
-                                isSelected={selectedUnitId === item2.id}
-                                hasChildren={true}
-                              />
+                  {openLevel1Id === item1.id && (
+                    <div>
+                      {level2Loading ? (
+                        <p className="text-xs text-slate-600 ml-8 py-2">
+                          Загрузка...
+                        </p>
+                      ) : Array.isArray(level2Data) && level2Data.length > 0 ? (
+                        level2Data.map((item2) => (
+                          <div key={item2.id}>
+                            <TreeNode item={item2} level={2} hasChildren />
 
-                              {/* Level 3 */}
-                              {openLevel2Id === item2.id && (
-                                <div>
-                                  {level3Loading ? (
-                                    <p className="text-xs text-slate-600 ml-12 py-2">
-                                      Загрузка...
-                                    </p>
-                                  ) : level3Data &&
-                                    Array.isArray(level3Data) &&
-                                    level3Data.length > 0 ? (
-                                    level3Data.map((item3) => (
-                                      <div key={item3.id}>
-                                        <TreeNode
-                                          item={item3}
-                                          level={3}
-                                          isSelected={
-                                            selectedUnitId === item3.id
-                                          }
-                                          hasChildren={true}
-                                        />
+                            {openLevel2Id === item2.id && (
+                              <div>
+                                {level3Loading ? (
+                                  <p className="text-xs text-slate-600 ml-12 py-2">
+                                    Загрузка...
+                                  </p>
+                                ) : Array.isArray(level3Data) &&
+                                  level3Data.length > 0 ? (
+                                  level3Data.map((item3) => (
+                                    <div key={item3.id}>
+                                      <TreeNode
+                                        item={item3}
+                                        level={3}
+                                        hasChildren
+                                      />
 
-                                        {/* Level 4 */}
-                                        {openLevel3Id === item3.id && (
-                                          <div>
-                                            {level4Loading ? (
-                                              <p className="text-xs text-slate-600 ml-16 py-2">
-                                                Загрузка...
-                                              </p>
-                                            ) : level4Data &&
-                                              Array.isArray(level4Data) &&
-                                              level4Data.length > 0 ? (
-                                              level4Data.map((item4) => (
-                                                <div key={item4.id}>
-                                                  <TreeNode
-                                                    item={item4}
-                                                    level={4}
-                                                    marginLeft={5}
-                                                    isSelected={
-                                                      selectedUnitId ===
-                                                      item4.id
-                                                    }
-                                                    hasChildren={true}
-                                                  />
+                                      {openLevel3Id === item3.id && (
+                                        <div>
+                                          {level4Loading ? (
+                                            <p className="text-xs text-slate-600 ml-16 py-2">
+                                              Загрузка...
+                                            </p>
+                                          ) : Array.isArray(level4Data) &&
+                                            level4Data.length > 0 ? (
+                                            level4Data.map((item4) => (
+                                              <div key={item4.id}>
+                                                <TreeNode
+                                                  item={item4}
+                                                  level={4}
+                                                  hasChildren
+                                                />
 
-                                                  {/* Level 5 */}
-                                                  {openLevel4Id ===
-                                                    item4.id && (
-                                                    <div>
-                                                      {level5Loading ? (
-                                                        <p className="text-xs text-slate-600 ml-20 py-2">
-                                                          Загрузка...
-                                                        </p>
-                                                      ) : level5Data &&
-                                                        Array.isArray(
-                                                          level5Data,
-                                                        ) &&
-                                                        level5Data.length >
-                                                          0 ? (
-                                                        level5Data.map(
-                                                          (item5) => (
-                                                            <TreeNode
-                                                              key={item5.id}
-                                                              item={item5}
-                                                              level={5}
-                                                              isSelected={
-                                                                selectedUnitId ===
-                                                                item5.id
-                                                              }
-                                                              hasChildren={
-                                                                false
-                                                              }
-                                                            />
-                                                          ),
-                                                        )
-                                                      ) : null}
-                                                    </div>
-                                                  )}
-                                                </div>
-                                              ))
-                                            ) : null}
-                                          </div>
-                                        )}
-                                      </div>
-                                    ))
-                                  ) : null}
-                                </div>
-                              )}
-                            </div>
-                          ))
-                        ) : null}
-                      </div>
-                    )}
-                  </div>
-                ))
-              ) : (
-                <p className="text-xs text-slate-600 px-3 py-2">Нет данных</p>
-              )}
-            </div>
+                                                {openLevel4Id === item4.id && (
+                                                  <div>
+                                                    {level5Loading ? (
+                                                      <p className="text-xs text-slate-600 ml-20 py-2">
+                                                        Загрузка...
+                                                      </p>
+                                                    ) : Array.isArray(
+                                                        level5Data,
+                                                      ) &&
+                                                      level5Data.length > 0 ? (
+                                                      level5Data.map(
+                                                        (item5) => (
+                                                          <TreeNode
+                                                            key={item5.id}
+                                                            item={item5}
+                                                            level={5}
+                                                            hasChildren={false}
+                                                          />
+                                                        ),
+                                                      )
+                                                    ) : null}
+                                                  </div>
+                                                )}
+                                              </div>
+                                            ))
+                                          ) : null}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))
+                                ) : null}
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      ) : null}
+                    </div>
+                  )}
+                </div>
+              ))
+            ) : (
+              <p className="text-xs text-slate-600 px-3 py-2">Нет данных</p>
+            )}
           </div>
         </div>
 
-        {/* Right content area */}
+        {/* Right content */}
         <div className="col-span-9">
           {selectedUnitId && (
             <CustomTable
-              title={`Опоздания - ${unitDetailData?.name || "Подразделение"}`}
+              title={`Опоздания — ${unitDetailData?.name ?? "Подразделение"}`}
               columns={["#", "Сотрудник", "Время прихода", "Причина", "Статус"]}
               data={tardinessDataList}
               isLoading={tardinessLoading}
@@ -469,10 +443,10 @@ const Index = () => {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-sm text-slate-300 font-mono-cyber">
-                    {item.arrival_time || item.check_in_time || "-"}
+                    {item.arrival_time ?? item.check_in_time ?? "-"}
                   </td>
                   <td className="px-4 py-3 text-sm text-slate-300">
-                    {item.reason || "-"}
+                    {item.reason ?? "-"}
                   </td>
                   <td className="px-4 py-3 text-sm">
                     <span
@@ -502,4 +476,5 @@ const Index = () => {
     </div>
   );
 };
+
 export default Index;
