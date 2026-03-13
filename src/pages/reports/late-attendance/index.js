@@ -2,13 +2,13 @@ import TitleOfThePage from "@/components/title";
 import { KEYS } from "@/constants/key";
 import { URLS } from "@/constants/url";
 import useGetQuery from "@/hooks/all/useGetQuery";
-import { requestEventTracker, requestPython } from "@/services/api";
+import { requestPython } from "@/services/api";
 import { useSession } from "next-auth/react";
 import { useState, useEffect, useCallback, useRef } from "react";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import { CustomTable } from "@/components/reports";
-import usePostQuery from "@/hooks/all/usePostQuery";
+import { config } from "@/config";
 
 const Index = () => {
   const { data: session } = useSession();
@@ -18,12 +18,12 @@ const Index = () => {
   const [openLevel3Id, setOpenLevel3Id] = useState(null);
   const [openLevel4Id, setOpenLevel4Id] = useState(null);
   const [selectedUnitId, setSelectedUnitId] = useState(null);
-  const [filterSessionId, setFilterSessionId] = useState(null);
+  const [tardinessDataList, setTardinessDataList] = useState([]);
+  const [tardinessLoading, setTardinessLoading] = useState(false);
   const [startDate, setStartDate] = useState(
     new Date().toISOString().slice(0, 10),
   );
 
-  // Track last employee IDs sent to avoid duplicate mutation calls
   const lastSentEmployeeIdsRef = useRef(null);
 
   // ─── LEVEL QUERIES ────────────────────────────────────────────────────────
@@ -136,95 +136,109 @@ const Index = () => {
 
   const workplaceData = unitDetailData?.workplace ?? [];
 
-  // ─── SESSION MUTATION ─────────────────────────────────────────────────────
-
-  const { mutate: sessionofSelectedEmployee } = usePostQuery({
-    listKeyId: "sessionOfTheEmployee",
-    apiClient: requestEventTracker,
-    onSuccess: (data) => {
-      // Log raw response so you can confirm the correct key name
-      console.log("Mutation raw response:", JSON.stringify(data));
-
-      // Support all common casing variants — update once you see the real key
-      const sessionId =
-        data?.filter_session_id ??
-        data?.filterSessionId ??
-        data?.session_id ??
-        data?.sessionId ??
-        data?.id ??
-        null;
-
-      if (sessionId) {
-        setFilterSessionId(sessionId);
-      } else {
-        console.warn(
-          "Could not extract session ID from mutation response. " +
-            "Check the console log above for the correct key name.",
-        );
-      }
-    },
-    onError: (error) => {
-      console.error("Session mutation error:", error?.response?.data ?? error);
-    },
-  });
-
-  // ─── FIRE MUTATION WHEN workplaceData CHANGES ─────────────────────────────
-  // Uses a ref to prevent re-firing when the mutate reference changes,
-  // and skips duplicate calls for the same employee list.
+  // ─── FETCH TARDINESS + EMPLOYEE DETAILS ───────────────────────────────────
 
   useEffect(() => {
     if (!workplaceData || workplaceData.length === 0) return;
+    if (!session?.accessToken) return;
 
     const employeeIds = workplaceData.map((item) => item.employee_id);
-    const serialized = JSON.stringify(employeeIds);
+    const serialized = JSON.stringify(employeeIds) + startDate;
 
-    // Skip if we already sent the exact same list
     if (lastSentEmployeeIdsRef.current === serialized) return;
     lastSentEmployeeIdsRef.current = serialized;
 
-    // Reset previous session so tardiness query doesn't fire stale data
-    setFilterSessionId(null);
+    const run = async () => {
+      setTardinessLoading(true);
+      setTardinessDataList([]);
 
-    sessionofSelectedEmployee({
-      url: URLS.sessionOfTheEmployee,
-      attributes: { employeeIds },
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${session?.accessToken}`,
-      },
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workplaceData]);
-  // NOTE: intentionally excluding `sessionofSelectedEmployee` and `session`
-  // from deps — they change every render and would cause infinite loops.
+      try {
+        // Step 1: POST to get filterSessionId
+        const postRes = await fetch(
+          `${config.EVENT_TRACKER_URL}${URLS.sessionOfTheEmployee}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${session.accessToken}`,
+            },
+            body: JSON.stringify({ employeeIds }),
+          },
+        );
 
-  // ─── TARDINESS QUERY ──────────────────────────────────────────────────────
+        if (!postRes.ok) {
+          console.error("filter-sessions POST failed:", postRes.status);
+          return;
+        }
 
-  const { data: tardinessData, isLoading: tardinessLoading } = useGetQuery({
-    key: ["tardiness", filterSessionId, startDate],
-    url: URLS.tardiness,
-    apiClient: requestEventTracker,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${session?.accessToken}`,
-    },
-    params: {
-      date: startDate?.split("T")[0],
-      filter_session_id: filterSessionId,
-    },
-    enabled: !!filterSessionId && !!session?.accessToken,
-  });
+        const postData = await postRes.json();
+        const filterSessionId =
+          postData?.filterSessionId ?? postData?.data?.filterSessionId ?? null;
 
-  const tardinessDataList = tardinessData?.data ?? tardinessData ?? [];
+        if (!filterSessionId) {
+          console.warn("No filterSessionId in response:", postData);
+          return;
+        }
+
+        // Step 2: GET tardiness
+        const getRes = await fetch(
+          `${config.EVENT_TRACKER_URL}${URLS.tardiness}?date=${startDate}&filter_session_id=${filterSessionId}`,
+          {
+            headers: { Authorization: `Bearer ${session.accessToken}` },
+          },
+        );
+
+        if (!getRes.ok) {
+          console.error("tardiness GET failed:", getRes.status);
+          return;
+        }
+
+        const getData = await getRes.json();
+        const items = getData?.data?.items ?? getData?.items ?? [];
+
+        // Step 3: Fetch employee details for each item in parallel
+        const itemsWithEmployees = await Promise.all(
+          items.map(async (item) => {
+            if (!item.employeeId) return { ...item, employee: null };
+
+            try {
+              const empRes = await fetch(
+                `${config.STAFFIO_URL}${URLS.employeePhoto}${item.employeeId}`,
+                {
+                  headers: { Authorization: `Bearer ${session?.accessToken}` },
+                },
+              );
+
+              if (!empRes.ok) return { ...item, employee: null };
+
+              const empData = await empRes.json();
+              return {
+                ...item,
+                employee: empData?.data ?? empData ?? null,
+              };
+            } catch {
+              return { ...item, employee: null };
+            }
+          }),
+        );
+
+        setTardinessDataList(itemsWithEmployees);
+      } catch (err) {
+        console.error("Tardiness fetch error:", err);
+      } finally {
+        setTardinessLoading(false);
+      }
+    };
+
+    run();
+  }, [workplaceData, startDate, session?.accessToken]);
 
   // ─── UNIT SELECT HANDLER ──────────────────────────────────────────────────
 
   const handleNodeClick = useCallback((item, level) => {
-    // Reset sent-ref so new unit triggers a fresh mutation
     lastSentEmployeeIdsRef.current = null;
-
     setSelectedUnitId(item.id);
-    setFilterSessionId(null);
+    setTardinessDataList([]);
 
     if (level === 1)
       setOpenLevel1Id((prev) => (prev === item.id ? null : item.id));
@@ -309,8 +323,8 @@ const Index = () => {
             type="date"
             value={startDate}
             onChange={(e) => {
+              lastSentEmployeeIdsRef.current = null;
               setStartDate(e.target.value);
-              // Re-trigger tardiness fetch for new date with same session
             }}
             className="w-full px-3 py-2 bg-slate-900 border border-white/[0.1] rounded-lg text-sm text-slate-300 font-mono-cyber focus:outline-none focus:border-sky-500/50"
           />
@@ -426,7 +440,13 @@ const Index = () => {
           {selectedUnitId && (
             <CustomTable
               title={`Опоздания — ${unitDetailData?.name ?? "Подразделение"}`}
-              columns={["#", "Сотрудник", "Время прихода", "Причина", "Статус"]}
+              columns={[
+                "#",
+                "Сотрудник",
+                "Время прихода",
+                "Опоздание (мин)",
+                "Статус",
+              ]}
               data={tardinessDataList}
               isLoading={tardinessLoading}
               renderRow={(item, index) => (
@@ -435,34 +455,54 @@ const Index = () => {
                     {index + 1}
                   </td>
                   <td className="px-4 py-3 text-sm text-slate-300">
-                    <div className="font-mono-cyber">
-                      {item.employee?.first_name} {item.employee?.last_name}
-                    </div>
-                    <div className="text-xs text-slate-500 mt-1">
-                      {item.employee?.tabel_number}
+                    <div className="flex items-center gap-3">
+                      {item.employee?.photo && (
+                        <img
+                          src={item.employee.photo}
+                          alt=""
+                          className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                        />
+                      )}
+                      <div>
+                        <div className="font-mono-cyber">
+                          {item.employee?.first_name ??
+                            item.employee?.firstName ??
+                            "—"}{" "}
+                          {item.employee?.last_name ??
+                            item.employee?.lastName ??
+                            ""}
+                        </div>
+                        <div className="text-xs text-slate-500 mt-0.5">
+                          {item.employee?.tabel_number ??
+                            item.employee?.tabelNumber ??
+                            item.employeeId}
+                        </div>
+                      </div>
                     </div>
                   </td>
                   <td className="px-4 py-3 text-sm text-slate-300 font-mono-cyber">
-                    {item.arrival_time ?? item.check_in_time ?? "-"}
+                    {item.firstIn ?? "-"}
                   </td>
-                  <td className="px-4 py-3 text-sm text-slate-300">
-                    {item.reason ?? "-"}
+                  <td className="px-4 py-3 text-sm text-slate-300 font-mono-cyber">
+                    {item.tardinessMinutes > 0
+                      ? `${item.tardinessMinutes} мин`
+                      : "-"}
                   </td>
                   <td className="px-4 py-3 text-sm">
                     <span
                       className={`px-2 py-1 rounded text-xs font-mono-cyber ${
-                        item.status === "approved"
-                          ? "bg-green-500/20 text-green-400"
-                          : item.status === "pending"
-                            ? "bg-yellow-500/20 text-yellow-400"
-                            : "bg-red-500/20 text-red-400"
+                        item.absent
+                          ? "bg-yellow-500/20 text-yellow-400"
+                          : item.isLate
+                            ? "bg-red-500/20 text-red-400"
+                            : "bg-green-500/20 text-green-400"
                       }`}
                     >
-                      {item.status === "approved"
-                        ? "Одобрено"
-                        : item.status === "pending"
-                          ? "На рассмотрении"
-                          : "Отклонено"}
+                      {item.absent
+                        ? "Отсутствует"
+                        : item.isLate
+                          ? "Опоздал"
+                          : "Вовремя"}
                     </span>
                   </td>
                 </>
